@@ -1,0 +1,23 @@
+## Interface: 16001
+## Title: |cff3fa9f5Level|rdon
+## Notes: Level guide for WoW Forever (beta, levels 1 to 30): the fastest route with quests, flight points, hearthstone, trainers and vendors, step by step with Questdon's compass.
+## Author: DonCoohd
+## Version: 0.2.0-beta
+## X-Curse-Project-ID: 1741614
+## Dependencies: Questdon
+## SavedVariables: LeveldonDB
+## SavedVariablesPerCharacter: LeveldonCharDB
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+
+Locales.lua
+Style.lua
+Training.lua
+Route.lua
+Leveldon.lua
+Window.lua
+Marks.lua
+Recorder.lua
+Report.lua
+Share.lua
+Resize.lua
+Fit.lua
