@@ -13,6 +13,7 @@ local deDE = {
   ["Accept"] = "Annehmen",
   ["Do"] = "Erledigen",
   ["Turn in"] = "Abgeben",
+  ["Preview: this part of the route is not tested yet."] = "Vorschau: Dieser Teil der Route ist noch nicht getestet.",
   ["Flight point"] = "Flugpunkt",
   ["Make this inn your home"] = "Dieses Gasthaus zum Zuhause machen",
   ["Use your hearthstone"] = "Ruhestein benutzen",

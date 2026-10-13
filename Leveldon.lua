@@ -85,7 +85,9 @@ local function LoadRoute()
           st.t = st.t + tOffset
         end
         merged.steps[#merged.steps + 1] = st
-        if t.hubopt then st._ho = true end -- (11.10.) its hubs already ordered by the builder (hubopt.py)
+        if t.hubopt then st._ho = true end
+        -- (13.10., Daniel: levels 30 to 60 ship at launch as a preview) the bands after 1 to 30 are not played yet
+        if bi > 1 then st._pv = true end -- (11.10.) its hubs already ordered by the builder (hubopt.py)
         -- the next band starts where the last one ended in another zone: travel to its first chapter
         if bi > 1 and k == 1 and st.k == "chapter" and not (t.steps[2] and t.steps[2].k == "travel") then
           merged.steps[#merged.steps + 1] = { k = "travel", n = st.n, ne = st.ne, el = st.el }
@@ -114,6 +116,33 @@ local GRAY = 8 -- a quest this many levels below the character is skipped
 local db
 local panel
 local cur = 1
+-- (13.10., Daniel's mage Zip: logged out at "turn in Lost Necklace", after the login Leveldon sent him to the mine,
+-- Billy still stood there with his quest) the step number alone counts the steps Leveldon put in while you played
+-- (trainer and vendor visits); after a login the route is composed without them and the same number is three steps
+-- further. So the route step itself is saved too (its index in the route, or the next route step's for a step
+-- that was put in) and found again after the login.
+function ns.SaveStep()
+  if not db then return end
+  db.step = cur
+  local ri
+  for j = cur, #STEPS do if STEPS[j] and STEPS[j]._i then ri = STEPS[j]._i break end end
+  db.stepRi = ri
+  -- (13.10.) and the next quest step itself: after a new build of the route (other step numbers) it is found again
+  db.stepK, db.stepQ = nil, nil
+  for j = cur, #STEPS do
+    local t = STEPS[j]
+    if t and t._i and t.q and (t.k == "accept" or t.k == "do" or t.k == "turnin") then db.stepK, db.stepQ = t.k, t.q break end
+  end
+end
+function ns.RestoreStep()
+  if not db or not db.step then return nil end
+  if type(db.stepRi) ~= "number" then return db.step end
+  local best
+  for j = 1, #STEPS do
+    if STEPS[j]._i == db.stepRi and (not best or math.abs(j - db.step) < math.abs(best - db.step)) then best = j end
+  end
+  return best or db.step
+end
 local marks = {} -- non-quest steps done this session: [index] = true
 ns.LeveldonMarks = function() return marks end -- (tests)
 local bindAtStep
@@ -181,7 +210,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.1"
+local VERSION = "0.2.2"
 ns.LeveldonVersion = VERSION
 
 -- (0.1.6, Daniel 10.10.) the texts of this version in one place (for the translations later)
@@ -641,6 +670,13 @@ local function Advance(initial)
   local guard = 0
   while cur <= #STEPS and guard < #STEPS do
     guard = guard + 1
+    -- (13.10., Daniel: "when I go a step back it simply jumps forward again, without me wanting it") a step you went
+    -- back to stays, even when it counts as done, until you go on yourself or something on it gets done now
+    local held = ns._held
+    if held and held.i == cur then
+      if held.wasDone and StepDone(cur) then break end
+      if StepDone(cur) then ns._held = nil end
+    end
     local s = STEPS[cur]
     if s._later and (StepDone(cur) or CantAfford(s.i)) then
       DropLater(cur)
@@ -674,7 +710,7 @@ local function Advance(initial)
       break
     end
   end
-  if db then db.step = cur end
+  ns.SaveStep()
 end
 
 -- (0.1.5) what the bought thing is for
@@ -2136,10 +2172,32 @@ function ns.CheckHub()
       for _, t in ipairs(STEPS) do
         if t.k == "train" and t.m == s.m and t.x and t.y and NearVisit(t) then tr = t break end
       end
+      -- (13.10., Daniel's mage Zip in Goldshire: "The Great Outdoors first would make more sense") quests right here
+      -- without a fight (its do step and turn-in next to you) come before the trainer
+      local at = last
+      while STEPS[at + 1] and STEPS[at + 1].k == "do" and not ((STEPS[at + 1].kills or 0) > 0)
+          and Within(STEPS[at + 1], s, NEAR.hub) do
+        at = HubEnd(STEPS, at + 1)
+      end
+      -- (13.10., Zip leaving Northshire at level 6: "better learn in Goldshire, you do not fight any more until then")
+      -- a trainer of your class the route passes before its next fight waits for that visit
+      local later = false
+      if tr then
+        for j = at + 1, #STEPS do
+          local u = STEPS[j]
+          if (u.k == "do" and (u.kills or 0) > 0) or u.k == "grind" then break end
+          if u.k ~= "train" and u.m and u.x then
+            for _, t in ipairs(STEPS) do
+              if t.k == "train" and t ~= tr and t.m == u.m and t.x and Within(t, u, H.service) and not Within(t, tr, H.service) then later = true break end
+            end
+          end
+          if later then break end
+        end
+      end
       local key = tr and ("train:" .. Key(tr))
-      if tr and now - (hubAsked[key] or -1e9) >= H.every then
+      if tr and not later and now - (hubAsked[key] or -1e9) >= H.every then
         hubAsked[key] = now
-        table.insert(STEPS, last + 1, { k = "train", n = tr.n, lvl = lv - lv % 2, m = tr.m, x = tr.x, y = tr.y, _hub = true })
+        table.insert(STEPS, at + 1, { k = "train", n = tr.n, lvl = lv - lv % 2, m = tr.m, x = tr.x, y = tr.y, _hub = true })
       end
     end
   end
@@ -2966,6 +3024,9 @@ local function Refresh()
     if not (Win and pcall(Win.Banner, panel, ns.ChName(ch), ch.lo, ch.hi, math.min(cur, #STEPS), #STEPS, ChapterProgress(), plan, (panel._width or 360) - 2)) then
       Style.Header(panel, (L["%s  ·  level %d to %d"]):format(ns.ChName(ch), ch.lo or 0, ch.hi or 0))
     end
+    if ch._pv then
+      Style.Row(panel):SetText(L["Preview: this part of the route is not tested yet."], B.textSecondary or "textSecondary")
+    end
   end
   -- (Daniel 12.10.: "the done steps from before up top are too much") no stations behind you any more
   local s = STEPS[cur]
@@ -3130,7 +3191,7 @@ function ns.LF.FollowPlayer()
   ns._recHow = "f"
   if ns.RecEvent then pcall(ns.RecEvent, "C", 0, cur, to) end
   cur = to
-  if db then db.step = cur end
+  ns.SaveStep()
   print((L["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."]):format(STEPS[cur] and (ns.QName(STEPS[cur]) or STEPS[cur].n) or "?"))
   ns.LF.seen, ns.LF.since, ns.LF.recent = STEPS[cur], Now(), {}
   return true
@@ -3143,7 +3204,7 @@ function Update(initial)
   if ns.CheckHub then pcall(ns.CheckHub) end
   if ns.CheckSell then pcall(ns.CheckSell) end
   Advance(initial)
-  if not initial then
+  if not initial and not (ns._held and ns._held.i == cur) then   -- (13.10.) a held step: no jumps either
     pcall(ns.LF.ClassNow)
     local ok, moved = pcall(ns.LF.FollowPlayer)
     if ok and moved then Advance(false) end
@@ -3182,6 +3243,8 @@ local function Skip(delta)
   cur = math.max(1, math.min(#STEPS + 1, cur + delta))
   if delta > 0 then marks[cur - 1] = true end
   if delta < 0 then marks[cur] = nil end
+  -- (13.10.) back: this step is held (Advance); forward ends the hold
+  if delta < 0 then ns._held = { i = cur, wasDone = StepDone(cur) } else ns._held = nil end
   -- (11.10., Daniel: The Adventurer reported "giver not there", then Leveldon wanted it turned in: "I don't have
   -- the quest") an accept skipped without the quest: its do and turn-in steps go by too (StepDone), back undoes it
   ns._acceptSkipped = ns._acceptSkipped or {}
@@ -3191,7 +3254,7 @@ local function Skip(delta)
     ns._acceptSkipped[STEPS[cur].q] = nil
   end
   bindAtStep = nil
-  if db then db.step = cur end
+  ns.SaveStep()
   if delta > 0 then Advance(false) end
   Arrow()
   pcall(MarkTick)
@@ -3204,7 +3267,8 @@ ns.LeveldonRecompose = function()
   local here = STEPS[cur]
   Compose()
   for j, s in ipairs(STEPS) do if s == here then cur = j break end end
-  if db then db.step = cur end
+  if ns._held then ns._held.i = cur end
+  ns.SaveStep()
   Update(false)
 end
 ns.LeveldonSkip = function(delta) Skip(delta) end -- (0.1.7 Report.lua: after a report the next step)
@@ -3265,8 +3329,10 @@ f:SetScript("OnEvent", function(_, event, ...)
     -- another route (race, class, a new build) than last time: the step number starts over, the speedrun clock
     -- too when race or class changed (a new build keeps your time)
     local key = (ROUTE.race or "?") .. ":" .. (ROUTE.cls or "?") .. ":" .. #ROUTE.steps
+    local remap
     if db.route ~= key then
-      if type(db.route) == "string" and db.route:match("^[^:]*:[^:]*") ~= key:match("^[^:]*:[^:]*") then db.run = nil end
+      if type(db.route) == "string" and db.route:match("^[^:]*:[^:]*") ~= key:match("^[^:]*:[^:]*") then db.run = nil
+      elseif db.stepK and db.stepQ then remap = { k = db.stepK, q = db.stepQ } end -- (13.10.) a new build: same quest step
       db.route, db.step = key, nil
     end
     -- (13.10.) the recording session started on the same event may have read the route before it was loaded
@@ -3274,7 +3340,11 @@ f:SetScript("OnEvent", function(_, event, ...)
     if rs then rs.route, rs.rid = db.route, ns.LeveldonRouteId() end
     Compose()
     Build()
-    cur = db.step or StartIndex()
+    cur = ns.RestoreStep() or StartIndex()
+    if remap then
+      for j, t in ipairs(STEPS) do if t.k == remap.k and t.q == remap.q then cur = j break end end
+      ns.SaveStep()
+    end
     C_Timer.After(2, function() Update(true) end) -- quest log and Questdon are ready by then
     sessionStart = Now()
     C_Timer.After(6, BagCheck)

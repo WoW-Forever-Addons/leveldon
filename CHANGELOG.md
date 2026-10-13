@@ -1,5 +1,13 @@
 # Changes
 
+## 0.2.2 Beta
+
+- **Levels 30 to 60 as a preview:** the routes go on to level 60. That part is not tested yet, and the window says so.
+- **Back after a login:** Leveldon starts at the step where you logged out (it was a few steps further when it had added trainer or vendor stops while you played), also after a route update.
+- **A step back stays:** when you go back a step, Leveldon no longer jumps forward again by itself.
+- **Trainer at the right time:** no walk back to the trainer when the route passes one of your class before its next fight; quests right where you stand come first.
+- **Smoother start areas:** what you just finished is handed in before new quests are taken, Camping 101: Cooking is handed in right after learning Cooking, and quest items are bought as late as it makes sense (in Northshire and Goldshire, for example Rest and Relaxation as you leave, the fishing bait in Stormwind).
+
 ## 0.2.1 Beta
 
 - **Deliveries on the way:** a quest you only hand in somewhere else is taken where it costs the least walking, for example Rest and Relaxation on the way out of Northshire.
