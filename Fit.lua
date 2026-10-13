@@ -332,6 +332,10 @@ function ns.CheckSell()
   end
   local why
   if ns.FreeSlots and ns.FreeSlots() <= 1 then why = "bags" end
+  -- (12.10., Daniel's hunter: "less than 100 arrows and I should keep killing") ammunition running out: the next
+  -- vendor that sells it, whatever the step
+  local AMMO_LOW = 100
+  if not why and ns.IsHunter and ns.IsHunter() and ns.AmmoCount and ns.AmmoCount() < AMMO_LOW then why = "ammo" end
   -- (11.10., Daniel's dwarf at level 1: "sell the loot right at the start?") for the money only with grey loot
   -- worth the way
   if not why and GetMoney and ns.SkillRank and (ns.GreyValue and ns.GreyValue() or 0) >= GREY_WORTH then
@@ -351,14 +355,14 @@ function ns.CheckSell()
   for _, v in ipairs(route.vendors or {}) do list[#list + 1] = v end
   for _, v in pairs(LeveldonDB and LeveldonDB.merchants or {}) do if type(v) == "table" then list[#list + 1] = v end end
   for _, v in ipairs(list) do
-    if v.m == here then
+    if v.m == here and (why ~= "ammo" or v.ammo) then
       local d = a.DistanceTo(v.m, v.x / 100, v.y / 100)
       if type(d) == "number" and d <= SELL_NEAR and (not bd or d < bd) then best, bd = v, d end
     end
   end
   if not best then return end
   sellAsked = now
-  table.insert(steps, cur, { k = "sell", n = best.n, m = best.m, x = best.x, y = best.y, why = why, t0 = now })
+  table.insert(steps, cur, { k = "sell", n = best.n, m = best.m, x = best.x, y = best.y, why = why, t0 = now, ammo = best.ammo })
 end
 ns.SellReset = function() sellAsked = -1e9 end -- (tests)
 

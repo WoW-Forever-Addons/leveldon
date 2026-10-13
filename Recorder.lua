@@ -31,13 +31,17 @@ local BUCKET = 60          -- seconds per XP/kill/combat line
 --   F m x y / f m x y          flight start / landing  H m x y                          hearthstone cast
 --   N npc m x y                talked to an NPC        B item count copper npc          bought
 --   S copper npc               sold (money in)         R spell                          learned a spell
---   W npc copper secs          trainer visit           G i ri k q how                   guide step (how: d s b)
+--   W npc copper secs          trainer visit           G i ri k q how                   guide step (how: d s b f)
 --   K xp kills combat n:c,...  per minute              Q reason step q                  a report (text in reports)
 --   I m x y / O m x y          went inside (cave, mine, building) / outside again: the way in
 -- (Daniel 11.10.: "1 to 7 except 3")
 --   J q i have need m x y      an objective's counter went up (where and when)
 --   Z kind secs m x y          a pause ended: eat (food or drink), afk, idle (standing, no fight, no NPC)
 --   Y n                        group size changed (0 = alone)
+--   C q at                     (13.10.) a class quest chain moved to step at (hunter at level 10)
+--   C 0 from to                (13.10.) the route followed you: from step "from" on to "to" (G how "f")
+--   P q level how              (13.10.) an accept above your level: m moved behind the next stop there, s left
+--                              out, w it was the step anyway (Leveldon moved on)
 --   M copper free              every 5 minutes: money and free bag slots; V 0 / V n: bags full / free again
 --   E inst type mapID / e inst secs   into an instance / out again (the quests in between were done there)
 --   D m x y npc                died (npc: your target then); U m x y: alive again (the time between
@@ -119,6 +123,7 @@ local function Start()
   t0 = Now()
   sess = { c = (name or "?") .. "-" .. (realm or ""), r = race, cl = cls, s = Clock(), lv = Level(),
     xp = Num(Call(UnitXP, "player")), route = ns.LeveldonRouteKey and ns.LeveldonRouteKey() or nil,
+    rid = ns.LeveldonRouteId and ns.LeveldonRouteId() or nil, -- (13.10.) the exact route bands played
     ver = ns.LeveldonVersion, m = Money(), rest = Num(Call(GetXPExhaustion)) or 0, e = {}, p = {} }
   rec.sessions[#rec.sessions + 1] = sess
   Recount()

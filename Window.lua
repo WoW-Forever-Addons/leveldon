@@ -95,11 +95,25 @@ local IDLE = 120
 local ticker = CreateFrame("Frame")
 local acc, lastActive = 0, nil
 function W.Active() lastActive = GetTime and GetTime() or 0 end
+-- (13.10., Daniel's error "Window.lua:101: attempt to perform numeric conversion on a secret number value") in
+-- combat the game hands out the speed (and other unit values) as secret values: never compute with one; a value we
+-- cannot read counts as busy
+local function Busy(f, ...)
+  if not f then return false end
+  local ok, v = pcall(f, ...)
+  if not ok then return true end
+  if issecretvalue and issecretvalue(v) then return true end
+  if type(v) == "number" then return v > 0 end
+  return v and true or false
+end
 function W.Idle()
   local now = GetTime and GetTime() or 0
-  if UnitIsAFK and UnitIsAFK("player") then return true end
-  if (GetUnitSpeed and (tonumber(GetUnitSpeed("player")) or 0) > 0) or (UnitAffectingCombat and UnitAffectingCombat("player"))
-    or (UnitCastingInfo and UnitCastingInfo("player")) or (UnitChannelInfo and UnitChannelInfo("player")) then
+  if UnitIsAFK then
+    local ok, afk = pcall(UnitIsAFK, "player")
+    if ok and afk == true then return true end
+  end
+  if Busy(UnitAffectingCombat, "player") or Busy(GetUnitSpeed, "player") or Busy(UnitCastingInfo, "player")
+    or Busy(UnitChannelInfo, "player") then
     lastActive = now
     return false
   end
@@ -112,7 +126,8 @@ ticker:SetScript("OnUpdate", function(_, dt)
   if lastActive == nil then W.Active() end
   acc = acc + (tonumber(dt) or 0)
   if acc >= 1 then
-    if not W.Idle() then r.t = r.t + acc end
+    local ok, idle = pcall(W.Idle)
+    if not (ok and idle) then r.t = r.t + acc end
     acc = 0
   end
 end)

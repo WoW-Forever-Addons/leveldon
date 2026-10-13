@@ -64,7 +64,7 @@ local function LoadRoute()
   if addon and loader and not (LeveldonRoutes and LeveldonRoutes[race]) then pcall(loader, addon) end
   local bands = LeveldonRoutes and LeveldonRoutes[race] and (LeveldonRoutes[race][cls] or LeveldonRoutes[race].warrior)
   if type(bands) ~= "table" then return false end
-  local merged = { race = race, cls = cls, steps = {}, early = {}, profOptions = {}, vendors = {}, keep = {}, dungeons = {}, links = {}, bonus = {} }
+  local merged = { race = race, cls = cls, steps = {}, early = {}, profOptions = {}, vendors = {}, keep = {}, dungeons = {}, links = {}, bonus = {}, ids = {} }
   local seenD, hours = {}, 0
   local tOffset = 0 -- (0.1.8) the planned times (t) of a band count from its start: the next band's go on
   -- (12.10., Daniel: dungeons as optional blocks) /lvd dungeons on: the 1 to 30 band the builder planned with the
@@ -75,6 +75,8 @@ local function LoadRoute()
     if bi == 1 and useDg then text = bands.dg end
     local t = Unpack(text)
     if t then
+      -- (13.10., data plan: route id in every recording) the id of each band you play (export_route.route_id)
+      if type(t.id) == "string" then merged.ids[#merged.ids + 1] = t.id end
       hours = hours + (tonumber(t.hours) or 0)
       local bandMax = 0
       for k, st in ipairs(t.steps or {}) do
@@ -164,13 +166,22 @@ local function ItemName(id, fallback)
 end
 
 
+-- (13.10., Daniel's hunter Don at Applejack Still: "path starts at 28, 59 ... should be mentioned, otherwise you do
+-- not find it"; "too hard in parts, 3 Defias in front of it") hints players gave for a quest, per step kind
+ns.STEP_NOTES = {
+  [91736] = {
+    accept = L["  (the way up starts at 28, 59; Defias stand around the still)"],
+    ["do"] = L["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"],
+  },
+}
+
 local VERB = {
   accept = L["Accept"], ["do"] = L["Do"], turnin = L["Turn in"], fp = L["Flight point"], bind = L["Make this inn your home"],
   hearth = L["Use your hearthstone"], train = L["Visit your trainer"], travel = L["Travel to"], grind = L["Grind"],
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.0"
+local VERSION = "0.2.1"
 ns.LeveldonVersion = VERSION
 
 -- (0.1.6, Daniel 10.10.) the texts of this version in one place (for the translations later)
@@ -504,6 +515,9 @@ local function StepDone(i)
   if marks[i] then return true end
   -- (0.1.7) a quest left out for now (not offered yet): its do and turn-in steps go by, unless you took it
   if (s.k == "do" or s.k == "turnin") and s.q and ns._acceptSkipped and ns._acceptSkipped[s.q] and not InLog(s.q) then return true end
+  -- (13.10., Daniel's hunter Don: "Elmore's Task" at level 7 stayed the step, it needs 9) once left out for its
+  -- level it stays left out wherever the route stands, until the level is there
+  if s.k == "accept" and s.q and ns._acceptSkipped and ns._acceptSkipped[s.q] and ns.TooLowFor and ns.TooLowFor(s.q) then return true end
   if s.k == "accept" then return QuestDone(s.q) or InLog(s.q) end
   if s.k == "do" then return QuestDone(s.q) or (InLog(s.q) and Complete(s.q)) end
   if s.k == "turnin" then return QuestDone(s.q) end
@@ -543,6 +557,13 @@ local function StepDone(i)
   if s.k == "sell" then
     return (ns._merchantAt or -1e9) >= (s.t0 or 0) or (s.why == "bags" and ns.FreeSlots ~= nil and ns.FreeSlots() >= 4)
   end
+  -- (13.10., Daniel's hunter Don: Fishin' Time's bait) a quest's hand-in item from a vendor on the way: done with
+  -- enough in the bags, or when the quest no longer needs it (done, objectives complete, left out, not offered)
+  if s.k == "buy" and s.q then
+    if ItemCount(s.i) >= (s.c or 1) or QuestDone(s.q) or (InLog(s.q) and Complete(s.q)) or blocked[s.q] then return true end
+    if ns._acceptSkipped and ns._acceptSkipped[s.q] and not InLog(s.q) then return true end
+    return ns.SKIP_QUESTS ~= nil and ns.SKIP_QUESTS[s.q] ~= nil
+  end
   -- (0.1.5, Daniel 09.10.) the tool is in the bags or worn, the recipe is learned
   if s.k == "buy" then
     return ItemCount(s.i) > 0 or (IsEquippedItem ~= nil and IsEquippedItem(s.i) == true) or (s.sp ~= nil and Knows(s.sp))
@@ -561,6 +582,7 @@ ns.LEARN_COST = 100
 ns.BuyWaits = function(idx)
   local s = STEPS[idx]
   if not (s and s.k == "buy") then return false end
+  if s.q then return false end -- (13.10.) a quest's item costs little and the quest needs it: no waiting
   if CantAfford(s.i) then return true end
   local p, m = BUY_PRICE[s.i], Money()
   if not (p and m) then return false end
@@ -631,7 +653,10 @@ local function Advance(initial)
       -- (0.1.7, Daniel 11.10.: "Break Sharptusk!" at level 2, the quest needs 3) the accept moves to the
       -- route's next visit of that NPC (the loop looks at the step that is here now); no later visit: it
       -- is left out for now, its do and turn-in steps too (StepDone)
-      if not (ns.MoveAcceptLater and ns.MoveAcceptLater(cur)) then
+      local movedOn = ns.MoveAcceptLater and ns.MoveAcceptLater(cur)
+      -- (13.10.) the recorder notes it: "P q level m" moved behind the next stop there, "P q level s" left out
+      if ns.RecEvent then pcall(ns.RecEvent, "P", s.q, select(2, ns.TooLowFor(s.q)) or 0, movedOn and "m" or "s") end
+      if not movedOn then
         ns._acceptSkipped = ns._acceptSkipped or {}
         if not ns._acceptSkipped[s.q] then
           local _, min = ns.TooLowFor(s.q)
@@ -677,6 +702,9 @@ local function StepText(s, upcoming)
     if s.ins then t = t .. L["  (inside the dungeon)"] elseif s.grp then t = t .. L["  (group quest)"] end
     if s.k == "accept" and s.esc then t = t .. L["  (escort: starts at once)"] end
     if s.k == "accept" and s.bc then t = t .. L["  (take it along: it leads to the next zone)"] end
+    -- (13.10.) a hint players gave for this quest (STEP_NOTES)
+    local note = s.q and ns.STEP_NOTES[s.q] and ns.STEP_NOTES[s.q][s.k]
+    if note then t = t .. note end
     if s.k == "turnin" and s._book then
       t = t .. T.bookChoose:format(ItemName(s._book.i, GATHER_BOOK[s._book.sk].n), ns.PName(s._book.sk))
     end
@@ -706,11 +734,17 @@ local function StepText(s, upcoming)
     if s.chain then return (L["Keep killing %s until the %s drops: it starts a quest chain worth the time"]):format(s.mob or "?", s.n or "?") end
     return T.farmBook:format(s.mob or "?", s.n or "?")
   elseif s.k == "sell" then
-    local why = (s.why == "bags" and L["your bags are full"]) or (s.why == "hub" and L["grey items, repairs"]) or L["you need the money for learning"]
+    local why = (s.why == "bags" and L["your bags are full"]) or (s.why == "hub" and L["grey items, repairs"])
+      or (s.why == "ammo" and L["almost out of arrows or bullets"]) or L["you need the money for learning"]
     if s.why == "hub" and s.ammo and ns.IsHunter and ns.IsHunter() and ns.AmmoCount() < ns.HUB.ammo then why = why .. L[", buy ammunition"] end -- (12.10. error 710: both are defined further down)
     return (L["%s at %s  (%s)"]):format(verb, s.n or "?", why)
   elseif s.k == "use" then
     return T.bookUse:format(s.n or "?", ns.PName(s.sk)) .. T.bookOther
+  elseif s.k == "buy" and s.q then
+    -- (13.10.) "Buy 3 Nightcrawlers from Catherine Leland  (for Fishin' Time)"
+    local item = ItemName(s.i, s.n) or "?"
+    if (s.c or 1) > 1 then item = (s.c or 1) .. " " .. item end
+    return (L["Buy %s from %s%s"]):format(item, s.v or "?", (L["  (for %s)"]):format(ns.QName(s) or "?"))
   elseif s.k == "buy" then
     -- (11.10., Daniel: "bought the fishing pole, should equip it, but I have not learned Fishing"; "bought the
     -- recipe, cannot learn it, not sent to Cooking yet") before the profession is learned the hint says so
@@ -1203,7 +1237,7 @@ function MergeBuys(out)
   for j, t in ipairs(out) do if t.k == "profs" then profsAt = j break end end
   if not profsAt then return end
   local buys, placed = {}, {}
-  for _, t in ipairs(out) do if t.k == "buy" and t.m and t.x and t.y then buys[#buys + 1] = t end end
+  for _, t in ipairs(out) do if t.k == "buy" and not t.q and t.m and t.x and t.y then buys[#buys + 1] = t end end
   for _, b in ipairs(buys) do
     local from = IndexIn(out, b)
     table.remove(out, from)
@@ -1782,9 +1816,9 @@ local function Compose()
   local bought, j = {}, 1
   while j <= #out do
     local t = out[j]
-    if t.k == "buy" and bought[t.i] then table.remove(out, j)
+    if t.k == "buy" and not t.q and bought[t.i] then table.remove(out, j)
     else
-      if t.k == "buy" then bought[t.i] = true end
+      if t.k == "buy" and not t.q then bought[t.i] = true end
       j = j + 1
     end
   end
@@ -1869,6 +1903,8 @@ ns.LeveldonStepText = function(i, upcoming) return StepText(STEPS[i], upcoming) 
 ns.LeveldonCompose = function() Compose() end -- (tests)
 ns.LeveldonCur = function(i) if i then cur = i end return cur end -- (tests; 0.1.7 also the recorder)
 ns.LeveldonRouteKey = function() return db and db.route end -- (0.1.7 recorder, reports)
+-- (13.10.) the ids of the route bands loaded ("2cf90623d2+..."), nil for a route without ids (built-in test route)
+ns.LeveldonRouteId = function() return ROUTE and ROUTE.ids and #ROUTE.ids > 0 and table.concat(ROUTE.ids, "+") or nil end
 ns.LeveldonRoute = function() return ROUTE end -- (0.1.7 tests)
 ns.LeveldonPanelFrame = function() return panel end -- (0.1.7 Resize.lua)
 
@@ -2030,12 +2066,15 @@ end
 --     The route's own trainer stops planned for a level you have not reached yet go by (as before); this one
 --     catches up at the next hub with your trainer.
 -- Both within HUB_SERVICE yards of a stop of the visit, on the same map.
-ns.HUB = { walk = 200, service = 150, every = 600, grey = 25, ammo = 400, wear = 0.6 }
+-- (12.10., Daniel's hunter: "selling at the start makes no sense"; "less than 100 arrows and I should keep killing
+-- although I am at the hub") grey loot alone from level greyLevel and greyc copper; ammunition below ammo (a hunter
+-- starts with 200 arrows, the old 400 sent him to the vendor at level 1)
+ns.HUB = { walk = 200, service = 150, every = 600, grey = 50, greyLevel = 4, ammo = 150, wear = 0.6 }
 do -- (no new main-chunk locals: Lua allows 200)
 local function HubSellWorth()
   local H = ns.HUB
   if ns.FreeSlots and ns.FreeSlots() <= 4 then return true end
-  if ns.GreyValue and ns.GreyValue() >= H.grey then return true end
+  if Level() >= H.greyLevel and ns.GreyValue and ns.GreyValue() >= H.grey then return true end
   if GetInventoryItemDurability then
     for slot = 1, 18 do
       local ok, c, m = pcall(GetInventoryItemDurability, slot)
@@ -2336,16 +2375,65 @@ local function CheckKeep(msg)
 end
 ns.CheckKeep = CheckKeep -- (tests)
 
+-- (12.10., Daniel: "quests later on that need items from earlier areas: those should be kept") besides the line
+-- when you loot it: the item's tooltip says it, and a vendor window lists what in your bags the route still needs
+do
+  local function KeepFor(id)
+    local k = id and ROUTE.keep and ROUTE.keep[id]
+    if k and not QuestDone(k.q) then return k end
+  end
+  ns.KeepFor = KeepFor -- (tests)
+  local function BagItems()
+    local out = {}
+    local C = C_Container
+    local slots = (C and C.GetContainerNumSlots) or GetContainerNumSlots
+    local idOf = (C and C.GetContainerItemID) or GetContainerItemID
+    local linkOf = (C and C.GetContainerItemLink) or GetContainerItemLink
+    if not (slots and idOf) then return out end
+    for bag = 0, 4 do
+      for slot = 1, (tonumber(slots(bag)) or 0) do
+        local id = idOf(bag, slot)
+        if id and not out[id] then out[id] = linkOf and linkOf(bag, slot) or (L["item "] .. id) end
+      end
+    end
+    return out
+  end
+  function ns.KeepAtMerchant()
+    local list = {}
+    for id, link in pairs(BagItems()) do
+      local k = KeepFor(id)
+      if k then list[#list + 1] = ("%s (%s)"):format(link, k.n or "?") end
+    end
+    if #list == 0 then return nil end
+    table.sort(list)
+    local text = (L["|cff3fa9f5Level|rdon: do not sell %s: the route needs it later."]):format(table.concat(list, ", ", 1, math.min(#list, 5)))
+    print(text)
+    return text
+  end
+  local function OnItemTooltip(tt, data)
+    local id = data and data.id
+    if not id and tt and tt.GetItem then local _, link = tt:GetItem() id = link and tonumber(link:match("item:(%d+)")) end
+    local k = KeepFor(id)
+    if k and tt and tt.AddLine then tt:AddLine((L["Leveldon: needed later for \"%s\""]):format(k.n or "?"), 0.25, 0.66, 0.96, true) end
+  end
+  ns.KeepTooltip = OnItemTooltip -- (tests)
+  if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType and Enum.TooltipDataType.Item then
+    pcall(TooltipDataProcessor.AddTooltipPostCall, Enum.TooltipDataType.Item, function(tt, data) pcall(OnItemTooltip, tt, data) end)
+  elseif GameTooltip and GameTooltip.HookScript then
+    pcall(GameTooltip.HookScript, GameTooltip, "OnTooltipSetItem", function(tt) pcall(OnItemTooltip, tt, nil) end)
+  end
+end
+
 local function BagCheck()
   local lines = {}
   if not CanCamp() then
-    if IsHunter() and AmmoCount() < 600 then print((L["|cff3fa9f5Level|rdon: before you go: only %d arrows or bullets."]):format(AmmoCount())) end
+    if IsHunter() and AmmoCount() < 300 then print((L["|cff3fa9f5Level|rdon: before you go: only %d arrows or bullets."]):format(AmmoCount())) end
     return
   end
   if not HasCampMaterial() then lines[#lines + 1] = L["no campfire material (Basic Campfire Kit, or Simple Wood and Flint and Tinder)"] end
   local f = FoodCount()
   if f and f < 10 then lines[#lines + 1] = (L["only %d food and drink in your bags"]):format(f) end
-  if IsHunter() and AmmoCount() < 600 then lines[#lines + 1] = (L["only %d arrows or bullets"]):format(AmmoCount()) end
+  if IsHunter() and AmmoCount() < 300 then lines[#lines + 1] = (L["only %d arrows or bullets"]):format(AmmoCount()) end
   if #lines > 0 then print(L["|cff3fa9f5Level|rdon: before you go: "] .. table.concat(lines, "; ") .. ".") end
 end
 
@@ -2698,6 +2786,23 @@ local function CheckProfsAtStart()
 end
 ns.CheckProfsAtStart = CheckProfsAtStart -- (tests)
 
+-- (13.10., Daniel's hunter Don picked "no professions", then learned Cooking, Fishing, First Aid and Skinning: the
+-- Camping 101 steps were not in his route) a profession you learn later comes into the route by itself
+function ns.CheckLearnedProfs()
+  if not db or (db.profs == nil and not db.noProfs) then return false end
+  local set, added = {}, {}
+  for sk in pairs(db.profs or {}) do set[sk] = true end
+  for _, list in ipairs({ PRIMARY, SECONDARY }) do
+    for _, sk in ipairs(list) do
+      if SkillRank(sk) and not set[sk] then set[sk] = true added[#added + 1] = ns.PName(sk) end
+    end
+  end
+  if #added == 0 then return false end
+  ApplyProfs(set, false)
+  print((L["|cff3fa9f5Level|rdon: you learned %s: its steps are in your route now."]):format(table.concat(added, ", ")))
+  return true
+end
+
 local function OnFirstAccept()
   if not db or db.firstAccept then return end
   db.firstAccept = true
@@ -2930,17 +3035,132 @@ local function Refresh()
 end
 
 local arrowStep, arrowKey
+-- (13.10., Daniel's hunter Don at level 10: "as a hunter the next step should always be the hunter quest, unless
+-- you can turn in a quest right where you are"; "the same for the important class quests, the warlock's
+-- Voidwalker for example") once you have the level of a class quest of your route (from level CLASS_MIN on: the pet,
+-- the Voidwalker, the bear, the totems, the stances), it comes next with the quests that follow it: after the steps
+-- at NPCs right here (within NEAR.hub of you), before everything else
+ns.LF = {} -- (13.10.) ClassNow and FollowPlayer (few locals: Lua allows 200 in this file)
+ns.LF.CLASS_MIN = 4
+function ns.LF.HereSteps(from, to)
+  local m = Map()
+  local x, y = ns.PlayerXY()
+  local me = m and x and { m = m, x = x, y = y }
+  local k = from - 1
+  while me and k + 1 < to and STEPS[k + 1] and NPC_KIND[STEPS[k + 1].k] and Within(STEPS[k + 1], me, NEAR.hub) do k = k + 1 end
+  return k
+end
+function ns.LF.Mine(g, classID)
+  for _, c in ipairs(g and g.classes or {}) do if c == classID then return true end end
+  return false
+end
+function ns.LF.ClassNow()
+  local _, _, classID = UnitClass("player")
+  local a = API()
+  if not (classID and a and a.GetQuest) then return false end
+  local first, g1
+  for j = cur, math.min(#STEPS, cur + 400) do
+    local t = STEPS[j]
+    if t.k == "accept" and t.q and not QuestDone(t.q) and not InLog(t.q) and not (ns._acceptSkipped and ns._acceptSkipped[t.q]) then
+      local g = a.GetQuest(t.q)
+      local min = g and tonumber(g.minLevel)
+      if min and min >= ns.LF.CLASS_MIN and min <= Level() and ns.LF.Mine(g, classID)
+          and not (a.CanTakeQuest and a.CanTakeQuest(t.q) == false) then first, g1 = j, g end
+    end
+    if first then break end
+  end
+  if not first then return false end
+  local at = ns.LF.HereSteps(cur, first) + 1
+  if first <= at then return false end
+  -- the chain: class quests taken at the same NPC and the ones that follow them, in their order
+  local chain, idx = { [STEPS[first].q] = true }, {}
+  for j = first, math.min(#STEPS, first + 80) do
+    local t = STEPS[j]
+    if t.q and not chain[t.q] and t.k == "accept" then
+      local g = a.GetQuest(t.q)
+      local follows = false
+      for _, p in ipairs(g and g.prereqs or {}) do if chain[p] then follows = true end end
+      if ns.LF.Mine(g, classID) and (follows or Within(t, STEPS[first], NEAR.hub)) then chain[t.q] = true end
+    end
+    if t.q and chain[t.q] and IsQuestStep(t) then idx[#idx + 1] = j end
+  end
+  local moved = {}
+  for n = #idx, 1, -1 do table.insert(moved, 1, table.remove(STEPS, idx[n])) end
+  for n, t in ipairs(moved) do table.insert(STEPS, at + n - 1, t) end
+  ns._classNowSaid = ns._classNowSaid or {}
+  if not ns._classNowSaid[moved[1].q] then
+    ns._classNowSaid[moved[1].q] = true
+    print((L["|cff3fa9f5Level|rdon: level %d: \"%s\" comes next (your class quest)."]):format(tonumber(g1.minLevel) or Level(), ns.QName(moved[1]) or "?"))
+  end
+  if ns.RecEvent then pcall(ns.RecEvent, "C", moved[1].q, at) end
+  return true
+end
+ns.LeveldonClassNow = ns.LF.ClassNow -- (tests)
+
+-- (13.10., Daniel's hunter Don: 47 min on "accept Applejack Still" while he did the Jasperlode Mine and the east
+-- of Elwynn himself) a step that stays for FOLLOW_SECONDS while you take or hand in quests that come later on the
+-- route: the route goes on from there (a chat line says so), the steps in between count as skipped
+ns.LF.SECONDS, ns.LF.QUESTS, ns.LF.since, ns.LF.seen, ns.LF.recent = 600, 2, 0, nil, {}
+function ns.NoteQuestEvent(q) if q then ns.LF.recent[q] = Now() end end
+function ns.LF.FollowPlayer()
+  if ns.LF.seen ~= STEPS[cur] then ns.LF.seen, ns.LF.since, ns.LF.recent = STEPS[cur], Now(), {} return false end
+  if Now() - ns.LF.since < ns.LF.SECONDS then return false end
+  -- not while you work on the step itself (its kills, a skill, a grind): quests you pick up meanwhile are no sign
+  local s0 = STEPS[cur]
+  if s0 and ((s0.k == "do" and s0.q and InLog(s0.q)) or s0.k == "grind" or s0.k == "skillup" or s0.k == "farm" or s0.k == "dungeon") then return false end
+  local first, hits, seen = nil, 0, {}
+  for j = cur + 1, math.min(#STEPS, cur + 120) do
+    local t = STEPS[j]
+    if t.q and IsQuestStep(t) and ns.LF.recent[t.q] and ns.LF.recent[t.q] >= ns.LF.since and StepDone(j) then
+      first = first or j
+      if not seen[t.q] then seen[t.q] = true hits = hits + 1 end
+    end
+  end
+  if hits < ns.LF.QUESTS then return false end
+  local to = first
+  while STEPS[to] and StepDone(to) do to = to + 1 end
+  ns._acceptSkipped = ns._acceptSkipped or {}
+  for k = cur, to - 1 do
+    local t = STEPS[k]
+    if not StepDone(k) then
+      marks[k] = true
+      if t.k == "accept" and t.q and not InLog(t.q) then ns._acceptSkipped[t.q] = true end
+    end
+  end
+  ns._recHow = "f"
+  if ns.RecEvent then pcall(ns.RecEvent, "C", 0, cur, to) end
+  cur = to
+  if db then db.step = cur end
+  print((L["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."]):format(STEPS[cur] and (ns.QName(STEPS[cur]) or STEPS[cur].n) or "?"))
+  ns.LF.seen, ns.LF.since, ns.LF.recent = STEPS[cur], Now(), {}
+  return true
+end
+ns.LeveldonFollow = ns.LF.FollowPlayer -- (tests)
+ns.LeveldonFollowClock = function(t) ns.LF.since = t end -- (tests)
+
 function Update(initial)
   local before = cur
   if ns.CheckHub then pcall(ns.CheckHub) end
   if ns.CheckSell then pcall(ns.CheckSell) end
   Advance(initial)
+  if not initial then
+    pcall(ns.LF.ClassNow)
+    local ok, moved = pcall(ns.LF.FollowPlayer)
+    if ok and moved then Advance(false) end
+  end
   if STEPS[cur] and STEPS[cur].k == "bind" and bindAtStep == nil then
     bindAtStep = GetBindLocation and GetBindLocation() or false
   end
   -- (0.1.4, Daniel 09.10.: no arrow after choosing professions) the steps were rebuilt under the same
   -- number: a new step object needs the arrow too
   pcall(PlaceLaterBuys)
+  -- (13.10., Daniel's hunter Don: "Elmore's Task" (level 9) stayed the step at level 7) whatever brought the route
+  -- here, an accept above your level does not stay the step ("P q level w" for the recorder)
+  local s0 = STEPS[cur]
+  if s0 and s0.k == "accept" and s0.q and ns.TooLowFor and ns.TooLowFor(s0.q) then
+    if ns.RecEvent then pcall(ns.RecEvent, "P", s0.q, select(2, ns.TooLowFor(s0.q)) or 0, "w") end
+    Advance(false)
+  end
   -- (0.1.6 playtest 1, Daniel 10.10.: the window said "Turn in", the arrow still "Do: ... 9/10") the arrow
   -- follows the step's kind and text at once (objective counts, a do that became a turn-in)
   local s = STEPS[cur]
@@ -3049,6 +3269,9 @@ f:SetScript("OnEvent", function(_, event, ...)
       if type(db.route) == "string" and db.route:match("^[^:]*:[^:]*") ~= key:match("^[^:]*:[^:]*") then db.run = nil end
       db.route, db.step = key, nil
     end
+    -- (13.10.) the recording session started on the same event may have read the route before it was loaded
+    local rs = ns.RecSession and ns.RecSession()
+    if rs then rs.route, rs.rid = db.route, ns.LeveldonRouteId() end
     Compose()
     Build()
     cur = db.step or StartIndex()
@@ -3093,6 +3316,8 @@ f:SetScript("OnEvent", function(_, event, ...)
   elseif event == "BAG_UPDATE_DELAYED" then
     pcall(CheckStarters)
   elseif event == "QUEST_ACCEPTED" then
+    local a1, a2 = ...
+    ns.NoteQuestEvent(tonumber(a2) or tonumber(a1)) -- (13.10.) FollowPlayer: quests taken while the step waits
     pcall(OnFirstAccept)
     pcall(CheckLogChains)
     Soon()
@@ -3100,6 +3325,7 @@ f:SetScript("OnEvent", function(_, event, ...)
     pcall(RecordIndoor)
     pcall(MarkInteract)
     if ns.NoteMerchant then pcall(ns.NoteMerchant) end
+    if ns.KeepAtMerchant then pcall(ns.KeepAtMerchant) end
     merchantAt = Now()
     ns._merchantAt = merchantAt
     Soon()
@@ -3112,6 +3338,12 @@ f:SetScript("OnEvent", function(_, event, ...)
     pcall(MarkInteract)
   elseif event == "QUEST_DETAIL" or event == "QUEST_PROGRESS" or event == "QUEST_COMPLETE" then
     pcall(RecordIndoor)
+  elseif event == "QUEST_TURNED_IN" then
+    ns.NoteQuestEvent(tonumber((...)))
+    Soon()
+  elseif event == "SKILL_LINES_CHANGED" then
+    pcall(ns.CheckLearnedProfs)
+    Soon()
   elseif event == "PLAYER_REGEN_ENABLED" then
     -- (0.1.6) what waited for the end of the fight
     if trackerPending then pcall(ApplyTracker) end

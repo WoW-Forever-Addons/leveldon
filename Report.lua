@@ -83,7 +83,8 @@ local function Save()
     m = m, x = x and math.floor(x * 100 + 0.5) / 100, y = y and math.floor(y * 100 + 0.5) / 100,
     step = ctx.step, ri = ctx.ri, k = ctx.k, q = ctx.q, title = ctx.title, book = ctx.fromBook or nil,
     reason = reason, text = text ~= "" and text or nil,
-    route = ns.LeveldonRouteKey and ns.LeveldonRouteKey() or nil, ver = ns.LeveldonVersion }
+    route = ns.LeveldonRouteKey and ns.LeveldonRouteKey() or nil, ver = ns.LeveldonVersion,
+    rid = ns.LeveldonRouteId and ns.LeveldonRouteId() or nil } -- (13.10.) the exact route bands
   while #r > MAX do table.remove(r, 1) end
   if ns.RecEvent then ns.RecEvent("Q", reason, ctx.step or 0, ctx.q or 0) end
   if ns.ShareReport then pcall(ns.ShareReport, ctx.ri, ctx.k, ctx.q, reason) end -- (0.2.0) the reason only

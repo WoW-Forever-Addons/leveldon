@@ -3,7 +3,7 @@
 ## Notes: Level guide for WoW Forever (beta, levels 1 to 30): the fastest route with quests, flight points, hearthstone, trainers and vendors, step by step with Questdon's compass.
 ## Notes-deDE: Levelguide für WoW Forever (Beta, Stufe 1 bis 30): die schnellste Route mit Quests, Flugpunkten, Ruhestein, Lehrern und Händlern, Schritt für Schritt mit Questdons Kompass.
 ## Author: DonCoohd
-## Version: 0.2.0-beta
+## Version: 0.2.1-beta
 ## X-Curse-Project-ID: 1741614
 ## Dependencies: Questdon
 ## SavedVariables: LeveldonDB
