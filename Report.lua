@@ -15,7 +15,7 @@ local MAX = 500
 local REASONS = {
   { key = "giver", text = L["Quest giver not there"] },
   { key = "route", text = L["Route makes no sense"] },
-  { key = "note", text = "Note" }, -- (11.10., Daniel: ideas and improvements; the step stays)
+  { key = "note", text = L["Note"] }, -- (11.10., Daniel: ideas and improvements; the step stays)
 }
 local BK = Style.BOOK or {}
 local function C(c, fallback) c = c or fallback return c[1], c[2], c[3] end
@@ -44,7 +44,7 @@ local function Context(c)
   else
     title = title or (ns.LeveldonStepText and ns.LeveldonStepText(cur)) or "-"
   end
-  return { step = cur, ri = s and s._i or nil, k = s and s.k or nil, q = q, title = title, fromBook = c.quest ~= nil }
+  return { step = cur, obj = s, ri = s and s._i or nil, k = s and s.k or nil, q = q, title = title, fromBook = c.quest ~= nil }
 end
 
 local function Button(parent, text, w, onClick)
@@ -93,10 +93,11 @@ local function Save()
   -- (from Leveldon's window, not from a quest card) moves on; a note does not ("a button for notes, I write
   -- improvements there, the quest must not move on")
   if not ctx.fromBook and reason ~= "note" and ns.LeveldonSkip then
-    ns.LeveldonSkip(1)
+    -- (15.10., review round 2) the reported step, not whatever came in meanwhile
+    if ns.LeveldonSkipStep and ctx.obj then ns.LeveldonSkipStep(ctx.obj) else ns.LeveldonSkip(1) end
     print(L["|cff3fa9f5Level|rdon: report saved ("] .. #r .. L[" in all), on to the next step. Thank you!"])
   else
-    print("|cff3fa9f5Level|rdon: " .. (reason == "note" and "note" or "report") .. L[" saved ("] .. #r .. L[" in all). Thank you!"])
+    print("|cff3fa9f5Level|rdon: " .. (reason == "note" and L["note"] or L["report"]) .. L[" saved ("] .. #r .. L[" in all). Thank you!"])
   end
 end
 
@@ -165,9 +166,9 @@ local function Create()
   box:EnableMouse(true)
   box:SetScript("OnMouseDown", function() eb:SetFocus() end)
   f.edit = eb
-  f.save = Button(f, "Save", 90, Save)
+  f.save = Button(f, L["Save"], 90, Save)
   f.save:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 12)
-  local cancel = Button(f, "Cancel", 90, function() f:Hide() end)
+  local cancel = Button(f, L["Cancel"], 90, function() f:Hide() end)
   cancel:SetPoint("RIGHT", f.save, "LEFT", -6, 0)
   if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "LeveldonReport") end
   f:Hide()

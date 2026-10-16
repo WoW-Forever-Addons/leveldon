@@ -2,7 +2,7 @@
 ## Title: |cff3fa9f5Level|rdon Routes: High Order Skyborne
 ## Notes: Leveldon's routes for High Order Skyborne, loaded only when you play this race.
 ## Author: DonCoohd
-## Version: 0.2.2-beta
+## Version: 0.2.3-beta
 ## Dependencies: Leveldon
 ## LoadOnDemand: 1
 

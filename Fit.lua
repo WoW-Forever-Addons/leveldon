@@ -26,7 +26,15 @@ ns.QUEST_TIPS = {
 ns.LEAD_OBJECTIVE = { [771] = 1 }
 ns.SKIP_QUESTS = {
   [1656] = L["A Task Unfinished (Mulgore): Antur Fallow stands up in the hills west of Camp Narache, the straight way runs into the mountains (Daniel 11.10.)"],
+  -- (15.10., Daniel's mage Zip) not offered: Investigate the Scourge of Stormwind is a Scourge invasion quest
+  -- (the giver never offered it, recorded), Research Access (mage) had nothing to take at the giver at level 9
+  [9260] = L["Investigate the Scourge of Stormwind: a Scourge invasion quest, not offered"],
+  [97286] = L["Research Access: not offered at the giver (Daniel's mage, level 9)"],
 }
+-- (15.10., Daniel's mage Zip: "Book Return is an elite quest, hard alone if nobody is there to help") group
+-- quests by Wowhead Forever (quest type 1): the route leaves them out; one you take yourself is marked
+ns.GROUP_QUESTS = {}
+for id in ("19 55 99 105 115 169 176 193 197 202 206 208 211 228 248 249 253 255 256 271 278 303 304 314 442 450 452 474 504 517 518 519 520 531 540 541 543 547 591 611 613 614 618 628 629 630 631 639 640 643 644 645 646 652 656 673 679 680 682 684 685 694 695 696 697 705 706 717 735 736 762 793 908 909 969 999 1005 1006 1051 1089 1090 1100 1107 1151 1166 1172 1173 1380 1381 1383 1424 1448 1488 1500 1655 1701 1713 1955 2078 2203 2359 2478 2499 2501 2721 2935 2937 2944 2946 2954 2966 2967 2971 2977 2993 2994 3062 3127 3181 3182 3201 3372 3385 3452 3463 3510 3514 3566 3602 3627 3628 3911 3962 4023 4146 4182 4787 4961 5054 5055 5056 5063 5065 5067 5068 5088 5098 5121 5124 5151 5153 5156 5162 5164 5166 5167 5168 5247 5264 5265 5461 5462 5464 5465 5803 5804 5862 5944 5981 6025 6041 6135 6136 6145 6146 6147 6148 6182 6183 6184 6185 6186 6283 6284 6481 6570 6983 7043 7582 7583 7603 7636 7701 7704 7816 7845 7846 7847 7849 7850 7861 7862 8283 8301 8302 8304 8306 8308 8309 8310 8314 8331 8332 8341 8348 8349 8361 8362 8363 8481 8498 8501 8502 8507 8534 8535 8536 8537 8538 8539 8551 8554 8606 8687 8731 8737 8738 8739 8740 8770 8771 8772 8773 8774 8775 8776 8777 8829 8928 8962 8963 8964 8965 8970 8985 8986 8987 8988 9051 79366 81730 81731 81732 81733 81734 81735 81736 81737 81738 81739 81740 81741 81742 81743 81744 81745 81746 81747 87318 87491 88756 88757 88758 91752 91775 91777 92706 93318 95042 95140 95885 95999 96135 96222 96261 97003 97005 97250 97985 98216 98283 98291 98293 98297 98310 98403 98427 99052 99156"):gmatch("%d+") do ns.GROUP_QUESTS[tonumber(id)] = true end
 
 -- (11.10., Daniel: "Grace of An'she and Mu'sha failed") quests with a timer: their do and turn-in go right
 -- behind the accept (Compose, ns.TimedOrder); seconds (from the quest texts; the game's own timer, when it
@@ -138,6 +146,19 @@ function ns.FitIn(q)
     db.extraPlans[q] = { doAt = doAt and here or nil, turnAt = here, n = name, d = doPt and { doPt.m, doPt.x, doPt.y } or nil,
       t = turnPt and { turnPt.m, turnPt.x, turnPt.y } or nil, class = true }
     if ns.LeveldonRecompose then ns.LeveldonRecompose() end
+    -- (15.10., review round 2) the route keeps its step by the step itself now: the class quest put in right here
+    -- (before it) comes first
+    local S, c = ns.LeveldonSteps and ns.LeveldonSteps(), ns.LeveldonCur and ns.LeveldonCur()
+    if S and c then
+      for j = math.max(1, c - 12), c - 1 do
+        if S[j] and S[j].q == q and (S[j].k == "do" or S[j].k == "turnin") then
+          ns.LeveldonCur(j)
+          if ns.SaveStep then ns.SaveStep() end
+          if ns.LeveldonRefresh then ns.LeveldonRefresh() end
+          break
+        end
+      end
+    end
     Say((L["\"%s\" is a class quest you need: Leveldon takes you there now."]):format(name))
     return true
   end
@@ -150,7 +171,8 @@ function ns.FitIn(q)
   db.extraPlans[q] = { doAt = doAt and RouteIndex(steps, doAt) or nil, turnAt = RouteIndex(steps, turnAt), n = name,
     d = doPt and { doPt.m, doPt.x, doPt.y } or nil, t = { turnPt.m, turnPt.x, turnPt.y } }
   if ns.LeveldonRecompose then ns.LeveldonRecompose() end
-  Say((L["\"%s\" fits your route: done along the way, turned in at a stop you pass anyway."]):format(name))
+  Say((L["\"%s\" fits your route: done along the way, turned in at a stop you pass anyway."]):format(name)
+    .. (ns.GROUP_QUESTS[q] and L[" It is a group quest (elite): hard alone, bring help."] or ""))
   return true
 end
 
@@ -215,7 +237,7 @@ function ns.ApplyExtraPlans(out)
       end
       local at = p.doAt and After(p.doAt)
       if p.d and at then
-        table.insert(out, at + 1, { k = "do", q = q, n = p.n, m = p.d[1], x = p.d[2], y = p.d[3], _extra = true })
+        table.insert(out, at + 1, { k = "do", q = q, n = p.n, m = p.d[1], x = p.d[2], y = p.d[3], _extra = true, grp = ns.GROUP_QUESTS[q] })
       end
       local tat = After(p.turnAt)
       if tat and at and tat <= at then tat = at + 1 end
@@ -292,7 +314,8 @@ function ns.GreyValue()
     for slot = 1, (C.GetContainerNumSlots(bag) or 0) do
       local ok, info = pcall(C.GetContainerItemInfo, bag, slot)
       if ok and type(info) == "table" and info.quality == 0 and not info.hasNoValue and info.itemID then
-        local price = select(11, GetItemInfo(info.itemID))
+        local gi = (C_Item and C_Item.GetItemInfo) or GetItemInfo   -- (review round 4) the C_Item one first
+        local price = gi and select(11, gi(info.itemID))
         if type(price) == "number" then sum = sum + price * (info.stackCount or 1) end
       end
     end
@@ -460,16 +483,18 @@ function ns.FinishNearbyFirst(steps, cur)
   end
   for j = cur + 1, math.min(#steps, cur + LOOK) do
     local n = steps[j]
-    if n and n.k == "do" and n.q and not pulled[n] and a.InQuestLog(n.q) and not a.IsQuestComplete(n.q) then
+    -- (review round 4) once per composition: after the steps are built again it is pulled again
+    if n and n.k == "do" and n.q and pulled[n] ~= ns._composeId and a.InQuestLog(n.q) and not a.IsQuestComplete(n.q) then
       local best
       for _, p in ipairs(a.ObjectivePoints(n.q) or {}) do
         local d = a.DistanceTo(p.mapID, p.x, p.y)
         if type(d) == "number" and (not best or d < best) then best = d end
       end
       if best and best <= NEAR_YD then
-        pulled[n] = true
+        pulled[n] = ns._composeId
         table.remove(steps, j)
         table.insert(steps, cur, n)
+        n._nearPulled = ns._composeId   -- (15.10., review round 3/4) moved here for now: SaveStep keeps the step it left
         return true
       end
     end

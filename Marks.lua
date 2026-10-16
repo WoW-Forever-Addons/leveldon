@@ -57,6 +57,15 @@ function M.Want()
   local icon = ICON[kind]
   if not icon then return nil end
   local w = { icon = icon, ids = {}, names = {}, kind = kind }
+  -- (15.10., review round 1) the NPC's id from the route (inn, flight master, profession and class trainer, vendor):
+  -- names alone matched in English only, and never the flight master or a profession trainer
+  if s.npc then w.ids[s.npc] = true end
+  if s.tn then w.names[Lower(s.tn) or ""] = true end   -- (15.10., review round 3) a start area's profession trainer
+  if s.k == "train" and s.tr then
+    local _, cls = UnitClass("player")
+    local t = cls and s.tr[cls]
+    if t and t.id then w.ids[t.id] = true end
+  end
   if s.k == "accept" and s.q and a and a.GetQuest then
     local q = a.GetQuest(s.q)
     for _, id in ipairs(q and q.givers or {}) do w.ids[id] = true end

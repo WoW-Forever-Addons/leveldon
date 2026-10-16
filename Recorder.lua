@@ -296,14 +296,22 @@ local lastStep, lastObj, lastAt
 local function StepWatch()
   if not ns.LeveldonCur then return end
   local i = ns.LeveldonCur()
-  if i == lastStep then return end
   local steps = ns.LeveldonSteps and ns.LeveldonSteps() or {}
   local s = steps[i]
+  -- (15.10., review round 3) a stop put in at the same number is a new step too (a vendor stop, a pulled class quest)
+  if i == lastStep and s == lastObj then return end
   local how = ns._recHow or "d"
   ns._recHow = nil
   if lastStep ~= nil then Ev("G", i, s and s._i or 0, s and s.k or "end", s and s.q or 0, how) end
   -- (0.2.0) the step just left, for the other Leveldon players (Share.lua)
-  if lastObj and ns.ShareStep then pcall(ns.ShareStep, lastObj, how, Now() - (lastAt or Now())) end
+  -- (15.10., review round 3) not when it was only pushed on by a stop put in before it (still ahead, not done)
+  local pushed = false
+  if lastObj then
+    for j = i, #steps do
+      if steps[j] == lastObj then pushed = not (ns.LeveldonStepDone and ns.LeveldonStepDone(j)) break end
+    end
+  end
+  if lastObj and ns.ShareStep and not pushed then pcall(ns.ShareStep, lastObj, how, Now() - (lastAt or Now())) end
   lastStep, lastObj, lastAt = i, s, Now()
 end
 ns.RecStepWatch = StepWatch -- (tests)
@@ -551,5 +559,5 @@ function ns.RecCommand(arg)
   elseif arg == "on" then LeveldonDB.recOff = nil end
   local n = rec and #rec.sessions or 0
   print((L["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."]):format(
-    On() and "on" or "off", n, counts.events, counts.points, LeveldonDB.reports and #LeveldonDB.reports or 0))
+    On() and L["on"] or L["off"], n, counts.events, counts.points, LeveldonDB.reports and #LeveldonDB.reports or 0))
 end

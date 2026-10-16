@@ -1,4 +1,4 @@
-# Leveldon 0.2.2 Beta (WoW Forever)
+# Leveldon 0.2.3 Beta (WoW Forever)
 
 Leveldon ist ein Levelguide für WoW Forever: die schnellste Route mit Quests, Flugpunkten, Ruhestein, Lehrern und Händlern, Schritt für Schritt, mit Questdons Kompass. Die Routen sind pro Volk und Klasse geplant.
 
@@ -14,7 +14,10 @@ Leveldon ist ein Levelguide für WoW Forever: die schnellste Route mit Quests, F
 - **Speedrun-Zeile** (`/lvd run` oder die Stoppuhr in der Kopfzeile, standardmäßig aus): deine Zeit auf der Route gegen den Plan, die letzten Stufenaufstiege und wie lange es bis zur nächsten Stufe dauert. Die Uhr hält an, wenn du 2 Minuten nichts tust.
 - **Aktuelle Station:** was zu tun ist, die Questziele als kleine Blöcke und Questdons Kompass. Er zeigt auf das Ziel, den Weg um Berge herum zeigen die Punkte auf der Minimap.
 - **Die nächsten Schritte** und kommende Stufen-Meilensteine.
-- **Lehrer und Händler:** Kommst du an einem Ort mit Händler oder deinem Klassenlehrer an, werden sie ein Schritt dieses Besuchs, wenn es sich lohnt. Beim Händler zählen graue Beute, volle Taschen, kaputte Ausrüstung und (Jäger) Munition, beim Lehrer neue Fähigkeiten.
+- **Lehrer und Händler:** Kommst du an einem Ort mit Händler oder deinem Klassenlehrer an, werden sie ein Schritt dieses Besuchs, wenn es sich lohnt. Beim Händler zählen graue Beute, volle Taschen, kaputte Ausrüstung und (Jäger) Munition, beim Lehrer neue Hauptzauber.
+- **Sparmodus beim Lehrer:** Leveldon empfiehlt nur die Hauptzauber, passend zu deiner Talentung, mit ihrem Preis, im Schritt und im Chat am Lehrer. Alles andere entscheidest du selbst, damit das Gold für das Reiten mit 40 reicht.
+- **Geld:** Berufe kommen dort in die Route, wo das Geld fürs nächste Klassentraining übrig bleibt. Fehlt es dir wirklich, sagt der Lernschritt, wie viel du aufheben solltest.
+- **Reiten mit 40:** ein Schritt beim Reitlehrer (120 Gold, Paladin und Hexenmeister 100 Gold). Fehlt das Gold, geht die Route zu Fuß weiter und Leveldon meldet sich, sobald du es hast.
 - **Nadeln über den NPCs:** Der NPC des aktuellen Schritts bekommt eine Nadel über der Namensplakette (gold: annehmen, grün: abgeben, türkis: Lehrer, orange: Händler, violett: Flugmeister und Gasthaus, rot: benannte Gegner). Dafür müssen die Namensplaketten freundlicher NPCs an sein. `/lvd raidmarks` schaltet sie ab.
 - **Berufe:** Am Anfang wählst du bis zu zwei Hauptberufe und die Nebenberufe, oder keine. Leveldon baut Lernen, Werkzeugkauf und das Hochleveln in die Route ein.
 - **Dungeons** (`/lvd dungeons on`): die Route mit den passenden Dungeons und ihren Quests.

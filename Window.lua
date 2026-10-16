@@ -394,8 +394,17 @@ function W.CompassTick()
     f.compass:Point(nil, facing)
   end
   local text = type(st.distText) == "string" and st.distText or ""
-  f.dist:SetText(text:match("^[%d%.,]+%s*[^%s,]*") or "") -- (12.10.) "39 yards" without the comma before the way hint
-  if f.way then f.way:SetText(text:match("^[%d%.,]+%s*%S*,%s*(.+)$") or "") end
+  -- (Questdon review 5) Questdon's own parts ("240 yards" / "the way around") like on its card; a text that does
+  -- not start with the distance ("In the objective area, nearest spot 52 yards") goes whole to the hint line under the
+  -- compass (it was empty: the narrow distance line has no room for it)
+  local short, way = st.distShort, st.distWay
+  if type(short) ~= "string" then
+    short = text:match("^[%d%.,]+%s*[^%s,]*") -- (12.10.) "39 yards" without the comma before the way hint
+    way = text:match("^[%d%.,]+%s*%S*,%s*(.+)$")
+    if not short then short, way = "", text end
+  end
+  f.dist:SetText(short or "")
+  if f.way then f.way:SetText(type(way) == "string" and way or "") end
 end
 
 local function Line(f, i)

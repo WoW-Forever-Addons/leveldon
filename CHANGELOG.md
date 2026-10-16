@@ -1,5 +1,29 @@
 # Changes
 
+## 0.2.3 Beta
+
+- **Compass with Questdon:** with Leveldon's window closed, Questdon's compass leads to your own quest again instead of Leveldon's step; in an objective area Leveldon's compass shows "In the objective area" instead of an empty distance.
+- **Trainer levels:** Shred and Seal of Fury at the levels WoW Forever's trainers teach them (20 and 26).
+- **Skip a quest:** right-click the current step for a small menu: skip this step, or skip the whole quest (taking, doing and handing in go by). One step back brings the quest back.
+- **Routes rebuilt with the newest quest data:** new quests in Teldrassil, Darkshore, the Barrens and Duskwood, the Mulgore chains in the right order.
+- **Faster routes:** low quests that cost more walking than they bring are left out (for example the three Stormwind deliveries at level 9), a few flight points are taken when you pass close by (Lakeshire, Darkshire, Auberdine), quests that want the same mobs are done together where it saves time, and the order of the steps is searched through again and again for shorter ways (finished quests are collected and handed in together when you come by anyway, never carried past their NPC). Quests the route would never hand in are no longer taken, and the hearthstone is only used when it is ready again. The 30 to 60 preview got real drop rates and the same treatment.
+- **Money for training first:** professions come in the route where the money for your next class training is left over (no more "learned professions in Goldshire, no silver for the trainer"), and a learn step tells you how much to keep when your real money is short, so you can skip it for now.
+- **Riding at 40:** a step at the riding trainer (120 gold; paladins and warlocks 100 gold, their mount comes with the class quest). Without the gold the route goes on on foot and Leveldon tells you in the chat once you have it.
+- **Saving mode at the trainer:** Leveldon sends you to the class trainer only for the main spells and recommends them with their price (in the step and in the chat at the trainer). Everything else is your choice, so the gold goes to riding. The recommendation follows your talents: a fire mage gets Fireball, a balance druid Wrath and Moonfire, an elemental shaman Chain Lightning.
+- **Gathering reminder:** an herbalist, miner or skinner sees "Pick herbs on the way: Herbalism 7 of 20" from early on, so the 20 for Camping 101 come along the way.
+- **Drops that start a quest:** a kill step says when a mob there drops the start of a quest (for example Croaky in Elwynn Forest or Gruff Swiftbite near Westbrook), elites marked as such.
+- **Buying goes on at once:** a buy step is done as soon as the items are in your bags.
+- **Arrow to the turn-in:** right after you finish a quest's objectives, the arrow points at where you hand it in.
+- **Group quests marked:** elite group quests like Book Return and Rare Books say "(group quest)" in the step, also in the book chain; with /lvd solo the chain stops before them.
+- **Quests that are not offered left out:** the Scourge invasion quests of every capital (Investigate the Scourge of Stormwind, Ironforge, Orgrimmar and the others) and, for mages, Research Access.
+- **Steps that were done early go by:** a hearthstone set, a flight path learned or a hearth already at home one step before the route asks for it no longer holds the route; a skipped quest stays skipped after a /reload, and a dungeon run does not wait for a quest of it you skipped.
+- **Following you when you play ahead:** a quest still in your log keeps its turn-in, and the route does not jump while you work on a quest.
+- **Trainer:** spells you could not pay at one visit are recommended again at the next, and spending talent points changes the recommendation at once. The pet trainer no longer counts as your class training.
+- **The route keeps its place:** no more jumps over open steps after a visit to your trainer, a talent point or choosing professions; after a /reload you are on the same step (also a vendor or tool buy), and steps you skipped stay skipped.
+- **Quests left out come back:** a quest left out because you were a level short, or because its prerequisite was not done yet, comes back once you can take it.
+- **More realistic plan:** kill counts follow what players really needed (items the same mobs drop count once, drop chances seen in play), kills at levels 6 to 10 take longer, quests no route can finish or that are never offered are left out, and Camping 101 First Aid and Fishing come after learning the skill.
+- **Fixes:** two quests above your level at the same NPC no longer move behind each other again and again; no trainer or innkeeper of the other faction in the route; quests that are only possible before their follow-up, after their dungeon run or as one of two choices are in the right order (or one of them left out); class quests are no longer pulled from far ahead; professions you drop in the list stay dropped; the riding reminder waits for level 40; a second Leveldon window no longer opens when switching dungeons; the sleeping bag reminder knows its time after a /reload.
+
 ## 0.2.2 Beta
 
 - **Levels 30 to 60 as a preview:** the routes go on to level 60. That part is not tested yet, and the window says so.

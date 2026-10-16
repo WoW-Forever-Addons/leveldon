@@ -55,6 +55,12 @@ local function Unpack(text)
 end
 local function LoadRoute()
   ns._acceptSkipped = nil -- (11.10.) skipped accepts belong to the route they were skipped on
+  -- (review round 4) moves of accepts kept in the saved variables (a /reload put them back); another route has others
+  local ldb = LeveldonCharDB
+  if ldb and ldb.laterKey ~= tostring(ldb.route) .. ":" .. tostring(ldb.dungeons) then ldb.laterMoves, ldb.pullMoves = nil, nil end
+  -- (15.10., review round 2) those skipped by hand stay (/lvd dungeons on|off loads the route again)
+  local cdb = LeveldonCharDB   -- ("db" is declared further down)
+  if cdb and cdb.skipAcc then ns._acceptSkipped = {} for q in pairs(cdb.skipAcc) do ns._acceptSkipped[q] = true end end
   local race = PlayerRaceKey()
   local _, cls = UnitClass("player")
   cls = cls and cls:lower()
@@ -121,12 +127,41 @@ local cur = 1
 -- (trainer and vendor visits); after a login the route is composed without them and the same number is three steps
 -- further. So the route step itself is saved too (its index in the route, or the next route step's for a step
 -- that was put in) and found again after the login.
+-- (15.10., review round 3) what a step is, for steps Compose builds anew and for saving: kind, quest, item, skill, name,
+-- level, route index
+function ns.StepKey(t)
+  return table.concat({ t.k or "", t.q or "", t.i or "", t.sk or "", t.n or "", t.lvl or "", t._i or "" }, "|")
+end
+function ns.LaterMove(q, after)
+  if not db then return end
+  db.laterMoves = db.laterMoves or {}
+  db.laterMoves[q] = after
+  db.laterKey = tostring(db.route) .. ":" .. tostring(db.dungeons)
+end
 function ns.SaveStep()
   if not db then return end
   db.step = cur
   local ri
-  for j = cur, #STEPS do if STEPS[j] and STEPS[j]._i then ri = STEPS[j]._i break end end
+  -- (15.10., review round 3) not a step moved or copied here (a retaken accept, a pulled class quest): its route index
+  -- is somewhere else
+  local function Own(t)
+    return t._i and not t._retake and t._pulled ~= ns._composeId and t._nearPulled ~= ns._composeId and t._movedLater ~= ns._composeId
+  end
+  for j = cur, #STEPS do if STEPS[j] and Own(STEPS[j]) then ri = STEPS[j]._i break end end
   db.stepRi = ri
+  -- and what the step is (a buy or a hub trainer stop has no route index: found again first)
+  local c = STEPS[cur]
+  -- (review round 4) not for a retaken copy or a later buy: their key is the original's, which lies behind
+  db.stepKey = c and not c._retake and not c._later and c._nearPulled ~= ns._composeId and ns.StepKey(c) or nil
+  -- (15.10., review round 3) and the route steps not done from here on: a step moved to here (ClassNow,
+  -- FinishNearbyFirst) has its own index from further on, and the login went past 20 open steps; it goes back to
+  -- the first of them in the route as composed after the login
+  local ris = {}
+  for j = cur, math.min(#STEPS, cur + 40) do
+    local t = STEPS[j]
+    if t and Own(t) and (j == cur or not (ns.LeveldonStepDone and ns.LeveldonStepDone(j))) then ris[#ris + 1] = t._i end
+  end
+  db.stepRis = ris
   -- (13.10.) and the next quest step itself: after a new build of the route (other step numbers) it is found again
   db.stepK, db.stepQ = nil, nil
   for j = cur, #STEPS do
@@ -141,9 +176,27 @@ function ns.RestoreStep()
   for j = 1, #STEPS do
     if STEPS[j]._i == db.stepRi and (not best or math.abs(j - db.step) < math.abs(best - db.step)) then best = j end
   end
+  if best and type(db.stepRis) == "table" and #db.stepRis > 0 then
+    local want = {}
+    for _, r in ipairs(db.stepRis) do want[r] = true end
+    for j = 1, #STEPS do
+      if want[STEPS[j]._i] and j < best and best - j <= 60 then best = j break end
+    end
+  end
+  -- (15.10., review round 3) the step itself near there (a buy, a hub trainer stop)
+  if best and type(db.stepKey) == "string" then
+    for d = 0, 25 do
+      for _, j in ipairs(d == 0 and { best } or { best - d, best + d }) do
+        local t = STEPS[j]
+        if t and ns.StepKey(t) == db.stepKey then return j end
+      end
+    end
+  end
   return best or db.step
 end
-local marks = {} -- non-quest steps done this session: [index] = true
+-- (15.10., review round 1) keyed by the step itself, not its number: steps put in or taken out (a sell or trainer
+-- stop, a recompose) no longer hand a mark to the wrong step (a hunter's flight-point mark skipped the sell step)
+local marks = setmetatable({}, { __mode = "k" }) -- non-quest steps done this session: [step] = true
 ns.LeveldonMarks = function() return marks end -- (tests)
 local bindAtStep
 local Update -- below (forward declaration)
@@ -210,7 +263,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.2"
+local VERSION = "0.2.3"
 ns.LeveldonVersion = VERSION
 
 -- (0.1.6, Daniel 10.10.) the texts of this version in one place (for the translations later)
@@ -262,6 +315,8 @@ local GATHER_BOOK = {
   [182] = { i = 247841, n = "Wild Harvest" },
 }
 local GATHER_ORDER = { 182, 186, 393 }
+ns.GATHER_REMIND = { [182] = L["Pick herbs on the way: Herbalism %d of %d"], [186] = L["Mine ore veins on the way: Mining %d of %d"],
+  [393] = L["Skin what you kill on the way: Skinning %d of %d"] }
 -- Rascally Rodents (Northshire), Coldridge Valley Mail Delivery, The Woodland Protector, A Humble Task,
 -- Galgar's Cactus Apple Surprise, Marla's Last Wish, Harvesting Windstones (Zephras Isle)
 -- (0.1.6, Daniel 10.10.: "Brother Paxton does not offer it without the book; it dropped within the first
@@ -313,7 +368,7 @@ local SKILL_EN = { [171] = "Alchemy", [164] = "Blacksmithing", [333] = "Enchanti
 local PROF_SPELL = { [171] = 2259, [164] = 2018, [333] = 7411, [202] = 4036, [182] = 2366, [165] = 2108, [186] = 2575,
   [393] = 8613, [197] = 3908, [129] = 3273, [185] = 2550, [356] = 7620 }
 -- Herbalism's spell is "Herb Gathering": the skill line's own names
-local HERB = { "Herbalism", "Kräuterkunde", "Herboristerie", "Herboristería", "Herborismo", "Травничество", "약초 채집", "草藥學" }
+local HERB = { "Herbalism", "Kräuterkunde", "Herboristerie", "Herboristería", "Herborismo", "Травничество", "약초 채집", "草藥學", "草药学" }
 
 -- Your rank in a profession, nil when you do not have it.
 -- (0.1.4, Daniel 09.10.: First Aid learned, the step did not go on) the skill window only lists the lines
@@ -358,13 +413,41 @@ function ns.TR.Data()
   local _, cls = UnitClass("player")
   return ns.TRAINING and cls and ns.TRAINING[cls] or nil
 end
+-- (15.10., Daniel: "recommend by the talents") the talent tree with the most points (5 or more, ahead of the others):
+-- Training.lua's TRAINING_SPEC turns its spells into main spells (add) and others into your choice (drop)
+function ns.TR.Spec()
+  if not (GetNumTalentTabs and GetTalentTabInfo) then return nil end
+  local best, bp, second = nil, 0, 0
+  for t = 1, (GetNumTalentTabs() or 0) do
+    local r = { GetTalentTabInfo(t) }
+    local pts = (type(r[1]) == "string" and r[3]) or r[5]
+    if type(pts) ~= "number" and GetNumTalents and GetTalentInfo then
+      pts = 0
+      for i = 1, (GetNumTalents(t) or 0) do pts = pts + (tonumber((select(5, GetTalentInfo(t, i)))) or 0) end
+    end
+    pts = tonumber(pts) or 0
+    if pts > bp then best, second, bp = t, bp, pts elseif pts > second then second = pts end
+  end
+  if best and bp >= 5 and bp > second then return best end
+  return nil
+end
+function ns.TR.Imp(e, spec)
+  local _, cls = UnitClass("player")
+  local sp = spec and ns.TRAINING_SPEC and cls and ns.TRAINING_SPEC[cls] and ns.TRAINING_SPEC[cls][spec]
+  if sp then
+    for _, n in ipairs(sp.add) do if n == e[5] then return 2 end end
+    for _, n in ipairs(sp.drop) do if n == e[5] then return math.min(e[2], 1) end end
+  end
+  return e[2]
+end
 function ns.TR.Pending(toLv, planned)
   local data = ns.TR.Data()
   if not data then return nil end
   local list, twos, ones = {}, 0, 0
+  local spec = ns.TR.Spec()
   for lv = 1, toLv do
     for _, e in ipairs(data[lv] or {}) do
-      local id, imp, prev, tal = e[1], e[2], e[3], e[4]
+      local id, imp, prev, tal = e[1], ns.TR.Imp(e, spec), e[3], e[4]
       if not (planned and planned[id]) and not Knows(id) and (tal == 0 or Knows(prev)) then
         list[#list + 1] = e
         if imp == 2 then twos = twos + 1 elseif imp == 1 then ones = ones + 1 end
@@ -373,7 +456,9 @@ function ns.TR.Pending(toLv, planned)
   end
   return twos, ones, list
 end
-function ns.TR.Worth(twos, ones, gap) return twos > 0 or ones >= 3 or (gap >= 6 and ones > 0) end
+-- (15.10., Daniel: "the super saving mode, recommend the spells to learn; whether the player learns more he can
+-- decide himself") a trainer visit only for the main spells (worth 2): the gold goes to riding at 40
+function ns.TR.Worth(twos, ones, gap) return twos > 0 end
 ns.LeveldonPendingTraining = ns.TR.Pending -- (tests)
 local function SkillRank(sk)
   local names = SkillNames(sk)
@@ -539,14 +624,27 @@ local function StepDone(i)
   if not s then return true end
   if (s.k == "accept" or s.k == "do" or s.k == "turnin") and s.q and blocked[s.q] then return true end
   -- only for the current step: a later quest's prerequisite may still come before it on the route
-  if i == cur and s.k == "accept" and s.q and Blocked(s.q) then return true end
+  if i == cur and s.k == "accept" and s.q and Blocked(s.q) then
+    -- (15.10., review round 3) left out like one too high: its do and turn-in go by, and it comes back once
+    -- Questdon allows it (ReturnLeftOut after a turn-in or a level; the cache is cleared then)
+    ns._acceptSkipped = ns._acceptSkipped or {}
+    ns._acceptSkipped[s.q] = true
+    return true
+  end
   if s.k == "chapter" then return true end
-  if marks[i] then return true end
+  if marks[s] then return true end
+  -- (15.10., review round 3) a step skipped by hand that Compose builds anew (a tool buy), also after a /reload
+  if db and db.skipKeys and db.skipKeys[ns.StepKey(s)] then return true end
+  -- (0.2.3) a quest skipped by hand (right-click menu): all its steps go by
+  if s.q and db and db.skipQ and db.skipQ[s.q] and (s.k == "accept" or s.k == "do" or s.k == "turnin" or s.k == "buy" or s.k == "farm") then return true end
   -- (0.1.7) a quest left out for now (not offered yet): its do and turn-in steps go by, unless you took it
   if (s.k == "do" or s.k == "turnin") and s.q and ns._acceptSkipped and ns._acceptSkipped[s.q] and not InLog(s.q) then return true end
   -- (13.10., Daniel's hunter Don: "Elmore's Task" at level 7 stayed the step, it needs 9) once left out for its
   -- level it stays left out wherever the route stands, until the level is there
   if s.k == "accept" and s.q and ns._acceptSkipped and ns._acceptSkipped[s.q] and ns.TooLowFor and ns.TooLowFor(s.q) then return true end
+  -- (15.10., review round 2) an accept skipped by hand, after a /reload or /lvd reset too (it sat below the return)
+  -- (db.skipAcc: skipped by hand or passed by following you; one left out for its level comes back with the level)
+  if s.k == "accept" and s.q and db and db.skipAcc and db.skipAcc[s.q] and not InLog(s.q) then return true end
   if s.k == "accept" then return QuestDone(s.q) or InLog(s.q) end
   if s.k == "do" then return QuestDone(s.q) or (InLog(s.q) and Complete(s.q)) end
   if s.k == "turnin" then return QuestDone(s.q) end
@@ -571,7 +669,16 @@ local function StepDone(i)
   if s.k == "dungeon" then
     -- (12.10.) a planned run lists its quests itself (qs); an offer takes them from the dungeon's list
     if s.qs then
-      for _, q in ipairs(s.qs) do if not (QuestDone(q) or (InLog(q) and Complete(q))) then return false end end
+      for _, q in ipairs(s.qs) do
+        -- (15.10., review round 1) a quest of the run skipped by hand, blocked or left out does not hold the run
+        local gone = (db and db.skipQ and db.skipQ[q]) or blocked[q] or (ns._acceptSkipped and ns._acceptSkipped[q] and not InLog(q))
+        -- (15.10., review round 2) its accept moved behind the run (too low then): not done in this run
+        if not gone and not InLog(q) and not QuestDone(q) then
+          gone = true
+          for j = 1, i - 1 do if STEPS[j].k == "accept" and STEPS[j].q == q then gone = false break end end
+        end
+        if not (gone or QuestDone(q) or (InLog(q) and Complete(q))) then return false end
+      end
       return true
     end
     local d = DUNGEON_BY_ID[s.id]
@@ -598,9 +705,24 @@ local function StepDone(i)
     return ItemCount(s.i) > 0 or (IsEquippedItem ~= nil and IsEquippedItem(s.i) == true) or (s.sp ~= nil and Knows(s.sp))
   end
   if s.k == "skillup" then return (SkillRank(s.sk) or 0) >= (s.need or 20) end
+  if s.k == "mount" then return ns.RidingKnown() end
+  -- (15.10., review round 1) standing at the hearth's place already (walked or flew there): nothing to do
+  if s.k == "hearth" and i == cur and s.m and s.x and Map() == s.m then
+    local x, y = ns.PlayerXY()
+    if x and ns.Within({ m = s.m, x = x, y = y }, s, 150) then return true end
+  end
   if s.k == "bind" then
     local now = GetBindLocation and GetBindLocation()
-    return bindAtStep ~= nil and now ~= nil and now ~= bindAtStep
+    -- (15.10., review round 1) bound a moment before the step came (the inn's turn-in first, the innkeeper on the
+    -- way): a home changed in the last minutes close to this inn counts
+    local ago = db and db.homeAt and GetTime and GetTime() - db.homeAt
+    if ago and ago >= 0 and ago < 600 and s.m and s.x and Map() == s.m then
+      local x, y = ns.PlayerXY()
+      if x and ns.Within({ m = s.m, x = x, y = y }, s, 200) then return true end
+    end
+    -- (15.10., review round 1) the home before binding belongs to this bind step (the next inn's step was done at
+    -- once: the home had changed since the first inn)
+    return bindAtStep ~= nil and bindAtStep.s == s and now ~= nil and now ~= bindAtStep.at
   end
   return false
 end
@@ -627,9 +749,144 @@ ns.BuyWaits = function(idx)
 end
 
 
+-- (15.10., Daniel's mage Zip: "fresh in Goldshire I learned professions and then had no silver for training")
+-- the money for your next class training (the main spells Leveldon recommends, Training.lua's TRAIN_COST from
+-- Wowhead Forever) from the last training up to the next even level
+-- (15.10., review round 3) a dungeon's name in the client's language (Questdon has the map's own name), else the
+-- route's English one
+function ns.DgName(id, n)
+  if not ns._dgNames then
+    ns._dgNames = {}
+    local ok, list = pcall(function() return QuestdonAPI and QuestdonAPI.Dungeons and QuestdonAPI.Dungeons() end)
+    for _, e in ipairs(ok and type(list) == "table" and list or {}) do if e.inst and e.name then ns._dgNames[e.inst] = e.name end end
+  end
+  return ns._dgNames[id] or n
+end
+ns.TrainReserve = function()
+  local _, cls = UnitClass("player")
+  local t = ns.TRAIN_COST and cls and ns.TRAIN_COST[cls]
+  if not t then return 0 end
+  local lv = Level()
+  local from, to = (db and db.trained) or 1, lv - lv % 2 + 2
+  local sum = 0
+  -- (15.10., review round 3) the main spells you do not know yet (a character that trained before Leveldon was
+  -- installed knows them: no reserve for them), their prices from Training.lua
+  local data, spec = ns.TR.Data(), ns.TR.Spec()
+  if data then
+    for l = from + 1, to do
+      for _, e in ipairs(data[l] or {}) do
+        if ns.TR.Imp(e, spec) == 2 and not Knows(e[1]) and (e[4] == 0 or Knows(e[3])) then sum = sum + (e[7] or 0) end
+      end
+    end
+    return sum
+  end
+  for l = from + 1, to do if t[l] then sum = sum + (t[l][3] or t[l][2] or 0) end end
+  return sum
+end
+-- a profession now would leave too little for that training: the money still missing (else nil)
+ns.LearnShort = function(s)
+  if not (s and s.k == "learn" and s.sk and SkillRank(s.sk) == nil) then return nil end
+  local m = Money()
+  if not m then return nil end
+  local need = ns.LEARN_COST + ns.TrainReserve()
+  if m >= need then return nil end
+  return need - m
+end
+
+
+-- (15.10., review round 1) the trainer window is your class trainer's, not a hunter's pet trainer: one of its
+-- services is a spell of your class (no services to read: yes, as before)
+function ns.TR.IsClassTrainer()
+  if not (GetNumTrainerServices and GetTrainerServiceInfo) then return true end
+  local n = tonumber(GetNumTrainerServices()) or 0
+  if n == 0 then return true end
+  local data = ns.TR.Data()
+  if not data then return true end
+  local names = {}
+  for _, list in pairs(data) do
+    for _, e in ipairs(list) do
+      names[e[5]] = true
+      local sn = SpellName(e[1])
+      if sn then names[sn] = true end
+    end
+  end
+  for i = 1, n do
+    local name = GetTrainerServiceInfo(i)
+    if name and names[name] then return true end
+  end
+  return false
+end
+-- (15.10., the super saving mode) at the class trainer: what Leveldon recommends now, with the price, in the chat
+function ns.TR.Recommend()
+  local _, _, list = ns.TR.Pending(Level())
+  if not list then return nil end
+  local names, sum, other = {}, 0, 0
+  local spec = ns.TR.Spec()
+  for _, e in ipairs(list) do
+    if ns.TR.Imp(e, spec) == 2 then
+      names[#names + 1] = (SpellName(e[1]) or e[5]) .. ((e[6] or 1) > 1 and (" " .. e[6]) or "")
+      sum = sum + (e[7] or 0)
+    else
+      other = other + 1
+    end
+  end
+  local msg
+  if #names > 0 and other == 0 then   -- (15.10., review round 1) no "The other 0 spells"
+    msg = (L["|cff3fa9f5Level|rdon recommends: %s (%s)."]):format(table.concat(names, ", "), MoneyText(sum))
+  elseif #names > 0 and other == 1 then
+    msg = (L["|cff3fa9f5Level|rdon recommends: %s (%s). The other spell is your choice: the gold goes to riding at 40."]):format(
+      table.concat(names, ", "), MoneyText(sum))
+  elseif #names > 0 then
+    msg = (L["|cff3fa9f5Level|rdon recommends: %s (%s). The other %d spells are your choice: the gold goes to riding at 40."]):format(
+      table.concat(names, ", "), MoneyText(sum), other)
+  elseif other == 1 then
+    msg = L["|cff3fa9f5Level|rdon: nothing important here now; the spell is your choice (the gold goes to riding at 40)."]
+  elseif other > 0 then
+    msg = (L["|cff3fa9f5Level|rdon: nothing important here now; the %d spells are your choice (the gold goes to riding at 40)."]):format(other)
+  end
+  if msg then print(msg) end
+  return msg
+end
+-- (15.10., Daniel: "stay at 40") riding at 40 costs 100 gold training and 20 gold for the mount (Warcraft Tavern,
+-- Forever riding guide); without the money the route goes on and Leveldon says so once you have it
+ns.MOUNT_COST = 1200000
+-- (15.10., Daniel: "paladin and warlock pay the same for the skill") their mount comes with the class quest
+ns.MountCost = function()
+  local _, cls = UnitClass("player")
+  if cls == "PALADIN" or cls == "WARLOCK" then return 1000000 end
+  return ns.MOUNT_COST
+end
+ns.RidingKnown = function()
+  if Knows(33388) or (IsSpellKnown and IsSpellKnown(33388)) then return true end -- Apprentice Riding
+  if GetNumSkillLines and GetSkillLineInfo then
+    for i = 1, GetNumSkillLines() do
+      local name = GetSkillLineInfo(i)
+      if name == "Riding" or name == "Reiten" then return true end
+    end
+  end
+  return false
+end
+ns.MountShort = function()
+  local m, cost = Money(), ns.MountCost()
+  if not m or m >= cost then return nil end
+  return cost - m
+end
+ns.MountReminder = function()
+  if not (db and db.mountLater) or ns._mountTold or ns.RidingKnown() or Level() < 40 then return end
+  if ns.MountShort() then return end
+  ns._mountTold = true
+  print((L["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."]):format(MoneyText(ns.MountCost())))
+end
+
+
 -- Too low by now: a quest far below the character.
 local function Outgrown(s)
-  return IsQuestStep(s) and s.lv and s.lv > 0 and s.lv + GRAY <= Level() and not InLog(s.q)
+  if not (IsQuestStep(s) and s.lv and s.lv > 0 and s.lv + GRAY <= Level() and not InLog(s.q)) then return false end
+  -- (15.10., review round 3) a class quest is needed however grey (Call of Earth: the totem)
+  local a = API()
+  local g = a and a.GetQuest and a.GetQuest(s.q)
+  if g and g.classes and #g.classes > 0 then return false end
+  return true
 end
 
 local function ChapterOf(i)
@@ -661,9 +918,6 @@ end
 local function DropLater(i)
   if not (STEPS[i] and STEPS[i]._later) then return false end
   table.remove(STEPS, i)
-  local moved = {}
-  for k, v in pairs(marks) do if k ~= i then moved[k > i and k - 1 or k] = v end end
-  marks = moved
   return true
 end
 local function Advance(initial)
@@ -673,7 +927,7 @@ local function Advance(initial)
     -- (13.10., Daniel: "when I go a step back it simply jumps forward again, without me wanting it") a step you went
     -- back to stays, even when it counts as done, until you go on yourself or something on it gets done now
     local held = ns._held
-    if held and held.i == cur then
+    if held and STEPS[cur] == held.s then
       if held.wasDone and StepDone(cur) then break end
       if StepDone(cur) then ns._held = nil end
     end
@@ -681,6 +935,11 @@ local function Advance(initial)
     if s._later and (StepDone(cur) or CantAfford(s.i)) then
       DropLater(cur)
     elseif StepDone(cur) or Outgrown(s) or (initial and not IsQuestStep(s) and LaterProgress(cur)) then
+      -- (15.10., review round 4) a trainer visit passed below its level: what it was to teach goes to the next visit
+      if s.k == "train" and Level() < (s.lvl or 0) and not marks[s] and not (db and (db.trained or 0) >= (s.lvl or 0)) then
+        marks[s] = true
+        ns._replan = true
+      end
       cur = cur + 1
     elseif (s.k == "do" or s.k == "turnin") and s.q and not InLog(s.q) and not QuestDone(s.q) and not s._retake
         and not (ns._acceptSkipped and ns._acceptSkipped[s.q]) and ns.RetakeBefore and ns.RetakeBefore(cur) then
@@ -689,7 +948,12 @@ local function Advance(initial)
       -- (0.1.7, Daniel 11.10.: "Break Sharptusk!" at level 2, the quest needs 3) the accept moves to the
       -- route's next visit of that NPC (the loop looks at the step that is here now); no later visit: it
       -- is left out for now, its do and turn-in steps too (StepDone)
-      local movedOn = ns.MoveAcceptLater and ns.MoveAcceptLater(cur)
+      -- (15.10., review round 1: Zip's recording, 13,275 moves in 96 s: Report to Gryan and Elmore's Task, both too
+      -- high, kept moving behind each other) each quest moves once per level; the second time it waits like a quest
+      -- with no later visit
+      ns._movedLvl = ns._movedLvl or {}
+      local movedOn = ns._movedLvl[s.q] ~= Level() and ns.MoveAcceptLater and ns.MoveAcceptLater(cur)
+      if movedOn then ns._movedLvl[s.q] = Level() end
       -- (13.10.) the recorder notes it: "P q level m" moved behind the next stop there, "P q level s" left out
       if ns.RecEvent then pcall(ns.RecEvent, "P", s.q, select(2, ns.TooLowFor(s.q)) or 0, movedOn and "m" or "s") end
       if not movedOn then
@@ -701,6 +965,15 @@ local function Advance(initial)
         ns._acceptSkipped[s.q] = true
         cur = cur + 1
       end
+    elseif s.k == "mount" and (Level() < 40 or ns.MountShort()) then
+      -- (15.10., Daniel: "stay at 40") not enough gold for riding: the route goes on, a word in the chat once you have it
+      if db and not db.mountLater and Level() >= 40 then
+        db.mountLater = true
+        print((L["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."]):format(
+          MoneyText(ns.MountCost()), MoneyText(ns.MountShort())))
+      end
+      if Level() < 40 and db then db.mountLater = true end   -- (review round 1) reached 40 later: the reminder then
+      cur = cur + 1
     elseif s.k == "buy" and ns.BuyWaits(cur) then
       -- (0.1.6 playtest 1, Daniel 10.10.: no money for the pick) the buy waits: a hint says what it costs,
       -- it comes back at the next vendor on the way that sells it once the money is there (never a detour)
@@ -725,6 +998,7 @@ local LURES = { [6529] = true }
 
 local function StepText(s, upcoming)
   if not s then return L["Route finished"] end
+  if s.k == "chapter" then return ns.ChName(s) end   -- (review round 4) going back onto the first header
   local kind = Kind(s, upcoming)
   local verb = VERB[kind] or s.k
   if s.k == "accept" or s.k == "do" or s.k == "turnin" then
@@ -741,6 +1015,14 @@ local function StepText(s, upcoming)
     -- (13.10.) a hint players gave for this quest (STEP_NOTES)
     local note = s.q and ns.STEP_NOTES[s.q] and ns.STEP_NOTES[s.q][s.k]
     if note then t = t .. note end
+    -- (15.10., Daniel's mage Zip: "while doing the murlocs, kill Croaky: he drops a quest head item"; then "there
+    -- must be something on the web for that") a mob here drops the start of a quest (CMaNGOS, ATT; the builder
+    -- puts it on the kill step): kill it too, until you have that quest or did it
+    if s.k == "do" and s.dq and s.dn and not QuestDone(s.dq) and not InLog(s.dq) then
+      -- (15.10., Daniel: "Croaky was an elite too, mark it like the group quest")
+      t = t .. (s.de and L["  (kill %s too, an elite: best with help; it drops the start of \"%s\")"]
+        or L["  (kill %s too: it drops the start of \"%s\")"]):format(s.dn, ns.QName({ q = s.dq, n = s.di }) or s.di or "?")
+    end
     if s.k == "turnin" and s._book then
       t = t .. T.bookChoose:format(ItemName(s._book.i, GATHER_BOOK[s._book.sk].n), ns.PName(s._book.sk))
     end
@@ -760,12 +1042,28 @@ local function StepText(s, upcoming)
   elseif s.k == "dungeon" then
     local d = DUNGEON_BY_ID[s.id]
     local n = s.qs and #s.qs or (d and #d.quests or 0)
-    if s.min then return (L["Run %s with a group (%d quests, about %d min)"]):format(s.n or "?", n, s.min) end
-    return (L["Run %s with a group (%d quests)"]):format(s.n or "?", n)
+    local dn = ns.DgName(s.id, s.n) or "?"   -- (review round 3) the client's name of the dungeon
+    if s.min then return (L["Run %s with a group (%d quests, about %d min)"]):format(dn, n, s.min) end
+    return (L["Run %s with a group (%d quests)"]):format(dn, n)
   elseif s.k == "profs" then
     return verb .. L[" (up to 2 primary, all secondary; click here)"]
+  elseif s.k == "mount" then
+    local _, cls = UnitClass("player")
+    if cls == "PALADIN" or cls == "WARLOCK" then
+      return (L["Learn riding at the riding trainer (%s); your mount comes with your class quest"]):format(MoneyText(ns.MountCost()))
+    end
+    return (L["Learn riding at the riding trainer and buy your mount (%s)"]):format(MoneyText(ns.MountCost()))
   elseif s.k == "learn" then
-    return (L["Learn %s at the trainer"]):format(s.sk and ns.PName(s.sk) or s.n or "?")
+    local txt = (L["Learn %s at the trainer"]):format(s.sk and ns.PName(s.sk) or s.n or "?")
+    local short = ns.LearnShort and ns.LearnShort(s)
+    local reserve = short and ns.TrainReserve()
+    if short and reserve == 0 then   -- (15.10., review round 1) no "keep 0 copper for your class training"
+      txt = txt .. (L["  (not enough money to learn it yet: %s missing; right-click: skip)"]):format(MoneyText(short))
+    elseif short then
+      txt = txt .. (L["  (better later: keep %s for your class training, %s still missing; right-click: skip)"]):format(
+        MoneyText(reserve), MoneyText(short))
+    end
+    return txt
   elseif s.k == "farm" then
     if s.chain then return (L["Keep killing %s until the %s drops: it starts a quest chain worth the time"]):format(s.mob or "?", s.n or "?") end
     return T.farmBook:format(s.mob or "?", s.n or "?")
@@ -866,6 +1164,8 @@ local IN_AREA = 60
 local function Arrow()
   local a = API()
   if not (a and a.SetArrowTarget) then return end
+  -- (16.10., Questdon review 3) the window closed: no step for Questdon's arrow (it followed the step anyway)
+  if panel and panel.IsShown and not panel:IsShown() then a.SetArrowTarget(nil) return end
   local s = STEPS[cur]
   if not s then a.SetArrowTarget(nil) return end
   -- (11.10., Daniel: "the step's quest selected in Blizzard's tracker too, so the map marks its ? or its area")
@@ -909,6 +1209,8 @@ local function Arrow()
   -- with Leveldon's own spot made it jump
   local old = ns._arrowT
   if t and t.area and old and old.area and old.questID == t.questID and old.label == t.label and #old.points == #t.points then return end
+  -- (15.10.) the same place and text again (the turn-in asked every 2 s): nothing to change
+  if t and old and not t.area and not old.area and old.mapID == t.mapID and old.x == t.x and old.y == t.y and old.label == t.label then return end
   ns._arrowT = t
   a.SetArrowTarget(t)
 end
@@ -1089,9 +1391,21 @@ end
 -- recipe, when Cooking is learned too (ck)
 local function BuySteps(src, sk, cooking)
   local out = {}
+  -- (15.10., review round 3) the same object on every Compose (a buy skipped by hand came back after the trainer)
+  ns._buyObj = ns._buyObj or setmetatable({}, { __mode = "k" })
   for _, b in ipairs(src and src.b or {}) do
     if not b.ck or cooking then
-      out[#out + 1] = { k = "buy", i = b.i, n = b.n, v = b.v, sp = b.sp, ck = b.ck, sk = sk, m = b.m, x = b.x, y = b.y }
+      -- the n-th use of this item entry in this Compose gets the n-th object of the last one
+      local list = ns._buyObj[b] or {}
+      ns._buyObj[b] = list
+      if list.id ~= ns._composeId then list.id, list.n = ns._composeId, 0 end
+      list.n = list.n + 1
+      local o = list[list.n]
+      if not o or o.sk ~= sk then
+        o = { k = "buy", i = b.i, n = b.n, v = b.v, sp = b.sp, ck = b.ck, sk = sk, m = b.m, x = b.x, y = b.y }
+        list[list.n] = o
+      end
+      out[#out + 1] = o
     end
   end
   return out
@@ -1099,6 +1413,64 @@ end
 
 local MERGE_NEAR = 6 -- map percent (about 200 yards in Elwynn Forest)
 local function IndexIn(list, obj) for i, s in ipairs(list) do if s == obj then return i end end end
+-- (15.10., review round 2) after Compose: the step you were on, or (a vendor or hub stop put in is not in the new
+-- list) the first step after it that still is; never past steps not done
+ns.RefindCur = function(here, old, at)
+  -- (15.10., review round 3, H1: 44 of 56 walks jumped 20 to 150 open steps at a trainer) the first place in the new
+  -- list of the steps from here on: a step moved here (ClassNow pulled a class quest from further on) goes back to
+  -- its own place, the steps after it count; a step Compose builds anew is found by what it is
+  local function Key(t)
+    return table.concat({ t.k or "", t.q or "", t.i or "", t.sk or "", t.n or "", t._i or "", t._early and 1 or "", t.lvl or "", t.id or "" }, "|")
+  end
+  local pos, byKey = {}, {}
+  for j, t in ipairs(STEPS) do
+    pos[t] = j
+    local k = Key(t)
+    byKey[k] = byKey[k] or {}
+    table.insert(byKey[k], j)
+  end
+  local function Find(t)
+    if pos[t] then return pos[t] end
+    if t._retake or t._later then return nil end   -- (review round 4) a copy: never the original by its key
+    local best
+    for _, j in ipairs(byKey[Key(t)] or {}) do if not best or math.abs(j - at) < math.abs(best - at) then best = j end end
+    return best
+  end
+  -- (review round 4) the step you are on, where it is now, unless it was moved here (pulled, retaken, moved for its
+  -- level): /lvd solo at an inn kept sending you back to a trainer visit Compose put earlier
+  local cid = ns._composeId or 0
+  local best
+  if here and pos[here] and not here._retake and here._pulled ~= cid - 1 and here._nearPulled ~= cid - 1 and here._movedLater ~= cid - 1 then
+    best = pos[here]
+  else
+    for k = at, math.min(#old, at + 60) do
+      local t = old[k]
+      -- (not a step moved further on for its level: its own place is behind)
+      local j = t and t._movedLater ~= cid - 1 and Find(t)
+      if j and (not best or j < best) then best = j end
+    end
+  end
+  if not best and here then best = Find(here) end
+  best = best or math.min(at, #STEPS + 1)
+  -- (15.10., review round 3) a stop put in while you play (a hub trainer or vendor stop) that you are on stays the
+  -- step: Compose does not build it, and its check does not ask again so soon
+  -- (review round 4) and the ones just ahead of it (a vendor and a hub trainer stop together)
+  local keep, hereKept = {}, false
+  for k = at, math.min(#old, at + 8) do
+    local t = old[k]
+    if t and (t._hub or t.k == "sell") and not pos[t] and not marks[t] then
+      keep[#keep + 1] = t
+      if t == here then hereKept = true end
+    end
+  end
+  -- the step you were on in front; stops that were ahead of it behind it (review round 4: /lvd solo at an inn showed a
+  -- hub trainer stop that came after it)
+  local others = {}
+  for _, t in ipairs(keep) do if t ~= here then others[#others + 1] = t end end
+  if hereKept then table.insert(STEPS, best, here) end
+  for n, t in ipairs(others) do table.insert(STEPS, best + n, t) end
+  return best
+end
 
 ---------------------------------------------------------------------------
 -- (0.1.6 playtest 1, Daniel 10.10.) Yards between two places of the route, from
@@ -1377,7 +1749,13 @@ function LearnDetours(out, turnins)
           local acc, tin
           for k = 1, #out do
             local t = out[k]
-            if not turnins and t.sk == L.sk and t.k == "accept" and k < li and not acc then acc = k end
+            if not turnins and t.sk == L.sk and t.k == "accept" and k < li and not acc then
+              -- (15.10., review round 3) not one handed in before this learn step (the 1-30 band's accept, pulled
+              -- behind the 30-60 band's learn step: "turn in Camping 101: Leatherworking" without the quest)
+              local handed = false
+              for m = k + 1, li - 1 do if out[m].k == "turnin" and out[m].q == t.q then handed = true break end end
+              if not handed then acc = k end
+            end
             if t.sk == L.sk and t.k == "turnin" and k > li and not tin then tin = k end
           end
           if acc then
@@ -1645,6 +2023,9 @@ local function GatherBook(out, chosen)
   if not j then return end
   local book = GATHER_BOOK[sk]
   local t = out[j]
+  -- (15.10., review round 3) the book quest handed in and that book not in your bags: the book went to another
+  -- profession, this one's trainer stays (a recompose took Mining's learn step away after the Skinning book)
+  if t.q and QuestDone(t.q) and ItemCount(book.i) == 0 then return end
   t._book = { i = book.i, sk = sk }
   table.insert(out, j + 1, { k = "use", i = book.i, sk = sk, q = nil, bq = t.q, n = ItemName(book.i, book.n), m = t.m, x = t.x, y = t.y })
   local i = 1
@@ -1708,6 +2089,12 @@ ns.MoveAcceptLater = function(i)
   to = to - 1
   local at = HubEnd(STEPS, to)
   table.insert(STEPS, at + 1, s)
+  s._movedLater = ns._composeId   -- (review round 3) moved in this composition: for RefindCur and SaveStep
+  -- (15.10., review round 3) and kept when the steps are built again (a trainer, a talent point): behind the same
+  -- route step
+  for j = at, 1, -1 do
+    if STEPS[j]._i then ns.LaterMove(s.q, STEPS[j]._i) break end
+  end
   -- its own do and turn-in steps that now stand before it go behind it, in their order
   local moved, j = {}, i
   while j <= at do
@@ -1730,6 +2117,7 @@ end
 
 local function Compose()
   laterPlaced = {}
+  ns._composeId = (ns._composeId or 0) + 1
   local chosen = db and db.profs
   for _, s in ipairs(ROUTE.steps) do s._fc = nil end
   local out, pending = {}, nil
@@ -1754,7 +2142,17 @@ local function Compose()
     if s.k == "train" and s.tr then
       local _, myClass = UnitClass("player")
       local t = myClass and s.tr[myClass]
-      if t then s = { k = "train", lvl = s.lvl, n = t.n, m = t.m, x = t.x, y = t.y, el = s.el, _i = s._i, _ho = s._ho } end
+      -- (15.10., review round 2) the same object every time (a rebuild at the trainer lost the step and the route
+      -- jumped), with the trainer's id for its map mark (names only match in English)
+      if t then
+        ns._trainObj = ns._trainObj or setmetatable({}, { __mode = "k" })
+        local o = ns._trainObj[s]
+        if not (o and o.cls == myClass) then
+          o = { k = "train", lvl = s.lvl, n = t.n, m = t.m, x = t.x, y = t.y, el = s.el, _i = s._i, _ho = s._ho, npc = t.id, cls = myClass }
+          ns._trainObj[s] = o
+        end
+        s = o
+      end
     end
     -- (0.1.7) quests taken out of the routes after reports (Fit.lua, ns.SKIP_QUESTS)
     local skipQ = s.q and ns.SKIP_QUESTS and ns.SKIP_QUESTS[s.q]
@@ -1766,7 +2164,7 @@ local function Compose()
     if s.k == "do" then
       for root, f in pairs(FARM_BOOK) do
         if (wantsBook or f.all) and f.after == s.q and ROUTE.bonus and ROUTE.bonus[root] and not planned_[root] and not QuestDone(root) then
-          out[#out + 1] = { k = "farm", q = root, i = f.i, n = ItemName(f.i, f.n), mob = f.mob, m = s.m, x = s.x, y = s.y, chain = not wantsBook }
+          out[#out + 1] = { k = "farm", q = root, i = f.i, n = ItemName(f.i, f.n), mob = L[f.mob], m = s.m, x = s.x, y = s.y, chain = not wantsBook }
           merges[#merges + 1] = { root = root, at = #out }
           planned_[root] = true
         end
@@ -1795,7 +2193,7 @@ local function Compose()
   table.sort(merges, function(a, b) return a.at > b.at end)
   for _, mg in ipairs(merges) do
     local last = mg.at
-    for _, c in ipairs(ROUTE.bonus and ROUTE.bonus[mg.root] or {}) do
+    for _, c in ipairs(ns.SoloChain(ROUTE.bonus and ROUTE.bonus[mg.root] or {})) do
       local found
       if c.m and c.x then
         -- (0.1.6 playtest 1, Daniel 10.10.: the book chain's quests stayed open while the route went on)
@@ -1837,7 +2235,15 @@ local function Compose()
         if NPC_KIND[t.k] and Within(t, e, NEAR.npc) then at = j break end
       end
       if at then
-        table.insert(out, at + 1, { k = "learn", sk = e.sk, n = e.n .. " (" .. (e.npc or "?") .. ")", m = e.m, x = e.x, y = e.y, _early = true })
+        -- (review round 3) the same object every time; the trainer's name for its map mark
+        ns._earlyObj = ns._earlyObj or setmetatable({}, { __mode = "k" })
+        local lo = ns._earlyObj[e]
+        if not lo or lo._used == ns._composeId then
+          lo = { k = "learn", sk = e.sk, n = e.n .. " (" .. (e.npc or "?") .. ")", m = e.m, x = e.x, y = e.y, _early = true, tn = e.npc }
+          ns._earlyObj[e] = lo
+        end
+        lo._used = ns._composeId
+        table.insert(out, at + 1, lo)
         for n, b in ipairs(BuySteps(e, e.sk, cooking)) do table.insert(out, at + 1 + n, b) end
         if not firstLearn or at + 1 <= firstLearn then firstLearn = at + 1 end
       end
@@ -1883,12 +2289,17 @@ local function Compose()
           table.remove(out, j)
           dropped = dropped + 1
         else
-          t.learns = {}
+          t.learns, t.optional = {}, 0
+          local spec = ns.TR.Spec()
+          -- (15.10., review round 1) a visit already past (nothing learned there, 5 copper) does not plan its
+          -- spells away: the next visit still recommends them
+          -- (review round 4) and not the visit just made (marked at the trainer window)
+          local future = t.lvl > ((db and db.trained) or 0) and not marks[t]
           for _, e in ipairs(list) do
-            planned[e[1]] = true
-            if e[2] > 0 then t.learns[#t.learns + 1] = e end
+            if future then planned[e[1]] = true end
+            local imp = ns.TR.Imp(e, spec)
+            if imp == 2 then t.learns[#t.learns + 1] = e elseif imp == 1 then t.optional = t.optional + 1 end
           end
-          table.sort(t.learns, function(a, b) return a[2] > b[2] end)
           last = t.lvl
           j = j + 1
         end
@@ -1897,6 +2308,50 @@ local function Compose()
       end
     end
     ns._trainDropped = dropped
+  end
+  -- (15.10., review round 3) accepts moved further on for their level (MoveAcceptLater) stay moved
+  -- (15.10., review round 4) class quests ClassNow pulled forward stay there
+  for q, before in pairs(db and db.pullMoves or {}) do
+    if not QuestDone(q) then
+      local bi
+      for j, t in ipairs(out) do if t._i == before then bi = j break end end
+      if bi then
+        local moved, j = {}, bi + 1
+        while j <= #out do
+          local t = out[j]
+          if t.q == q and (t.k == "accept" or t.k == "do" or t.k == "turnin") then table.insert(moved, table.remove(out, j)) else j = j + 1 end
+        end
+        -- (an accept left behind would follow its own kill step: then nothing moves)
+        local accBefore = false
+        for j2 = 1, bi - 1 do if out[j2].q == q and out[j2].k == "accept" then accBefore = true end end
+        local accMoved = false
+        for _, t in ipairs(moved) do if t.k == "accept" then accMoved = true end end
+        if accMoved or accBefore or #moved == 0 then
+          for k, t in ipairs(moved) do table.insert(out, bi + k - 1, t) t._pulled = ns._composeId end
+        else
+          for _, t in ipairs(moved) do table.insert(out, t) end
+        end
+      end
+    end
+  end
+  for q, after in pairs(db and db.laterMoves or {}) do
+    local ai, ti
+    for j, t in ipairs(out) do
+      if t.k == "accept" and t.q == q and not ai then ai = j end
+      if t._i == after then ti = j end
+    end
+    if ai and ti and ai < ti and not QuestDone(q) and not InLog(q) then
+      local a = table.remove(out, ai)
+      table.insert(out, ti, a)   -- (ti - 1 + 1: right after that step)
+      a._movedLater = ns._composeId
+      -- its own do and turn-in steps that now stand before it go behind it, in their order
+      local moved, j = {}, 1   -- (review round 4) any of them before it, not only those between
+      while j < ti do
+        local t = out[j]
+        if t.q == q and (t.k == "do" or t.k == "turnin") then table.insert(moved, table.remove(out, j)) ti = ti - 1 else j = j + 1 end
+      end
+      for k, t in ipairs(moved) do table.insert(out, ti + k, t) end
+    end
   end
   STEPS = out
 end
@@ -1921,9 +2376,6 @@ local function PlaceLaterBuys()
           if v then
             local b = { k = "buy", i = i, n = info.n, v = v.n, m = v.m, x = v.x, y = v.y, sk = info.sk, sp = info.sp, ck = info.ck, _later = true }
             table.insert(STEPS, j + 1, b)
-            local moved = {}
-            for k, val in pairs(marks) do moved[k > j and k + 1 or k] = val end
-            marks = moved
             laterPlaced[i] = b
             break
           end
@@ -1992,6 +2444,9 @@ function ns.Bag.Left()
     if name == ns.Bag.buff then return expires and expires > 0 and (expires - Now()) or ns.Bag.lasts end
   end
   if ns.Bag.at > 0 and Now() - ns.Bag.at < ns.Bag.lasts then return ns.Bag.lasts - (Now() - ns.Bag.at) end
+  -- (15.10., review round 1) after a reload, in every language: the time you lay down, kept in the saved variables
+  local at = db and tonumber(db.bagAt)
+  if at and time and time() - at < ns.Bag.lasts then return ns.Bag.lasts - (time() - at) end
   return nil
 end
 ns.SleepingBagHint = function() -- (tests)
@@ -2197,7 +2652,7 @@ function ns.CheckHub()
       local key = tr and ("train:" .. Key(tr))
       if tr and not later and now - (hubAsked[key] or -1e9) >= H.every then
         hubAsked[key] = now
-        table.insert(STEPS, at + 1, { k = "train", n = tr.n, lvl = lv - lv % 2, m = tr.m, x = tr.x, y = tr.y, _hub = true })
+        table.insert(STEPS, at + 1, { k = "train", n = tr.n, lvl = lv - lv % 2, m = tr.m, x = tr.x, y = tr.y, npc = tr.npc or tr.id, _hub = true })
       end
     end
   end
@@ -2262,6 +2717,21 @@ local function Hints(s)
   end
   -- (11.10., Daniel: "a button: I have enough", other meat for Cooking, not enough Linen) a skill-up can be left
   if s and s.k == "skillup" then out[#out + 1] = { L["Enough already, or no materials? The arrow \194\187 above goes on"], "textHint" } end
+  -- (15.10., Daniel's mage Zip: "why does it send me to the herbs there? It should be a reminder", "I thought of
+  -- being an herbalist much too late"; Camping 101 needs 20) a gathering skill-up later on the route: a reminder
+  -- from now on, so the skill comes along the way and the step is done when you get there
+  if s and s.k ~= "skillup" then
+    for j = cur + 1, math.min(#STEPS, cur + 200) do
+      local t = STEPS[j]
+      if t and t.k == "skillup" and ns.GATHER_REMIND[t.sk] then
+        local rank = SkillRank(t.sk)
+        if rank and rank < (t.need or 20) then
+          out[#out + 1] = { ns.GATHER_REMIND[t.sk]:format(rank, t.need or 20), "accent" }
+        end
+        break
+      end
+    end
+  end
   -- (11.10., Daniel: "Kyle: nothing in the quest log", the game shows only "Kyle fed") what the game does not say
   local tip = s and s.q and (s.k == "do" or Kind(s) == "do" or s.k == "accept") and ns.QUEST_TIPS and ns.QUEST_TIPS[s.q]
   if tip then out[#out + 1] = { tip, "accent" } end
@@ -2271,14 +2741,18 @@ local function Hints(s)
     out[#out + 1] = { (s.k == "turnin" and L["The turn-in NPC"] or L["The quest giver"]) .. L[" walks around: look nearby"], "accent" }
   end
   -- (0.1.7) a trainer visit: what it teaches that counts (the most important first)
+  -- (15.10., the super saving mode) the recommended spells with their price; the rest is your choice
   if s and s.k == "train" and s.learns and #s.learns > 0 then
-    local names = {}
-    for k = 1, math.min(4, #s.learns) do
-      local e = s.learns[k]
-      names[#names + 1] = (SpellName(e[1]) or e[5]) .. (e[6] > 1 and (" " .. e[6]) or "")
+    local names, sum = {}, 0
+    for k, e in ipairs(s.learns) do
+      sum = sum + (e[7] or 0)
+      if k <= 4 then names[#names + 1] = (SpellName(e[1]) or e[5]) .. (e[6] > 1 and (" " .. e[6]) or "") end
     end
     local more = #s.learns - #names
-    out[#out + 1] = { L["New: "] .. table.concat(names, ", ") .. (more > 0 and (L[" and "] .. more .. L[" more"]) or ""), "accent" }
+    local line = L["Recommended: "] .. table.concat(names, ", ") .. (more > 0 and (L[" and "] .. more .. L[" more"]) or "")
+    if sum > 0 then line = line .. " (" .. MoneyText(sum) .. ")" end
+    if (s.optional or 0) > 0 then line = line .. (L["; %d more spells are your choice (saving for riding)"]):format(s.optional) end
+    out[#out + 1] = { line, "accent" }
   end
   if s and Kind(s) == "do" and InLog(s.q) then
     local _, d = NearestObjective(s.q)
@@ -2340,7 +2814,7 @@ local function Hints(s)
   for _, d in ipairs(ROUTE.withDungeons and {} or ROUTE.dungeons or {}) do -- (12.10.) planned in: no offer
     local lv = Level()
     if db and lv >= d.lo and lv <= d.lo + 6 and not (db.dSkip and db.dSkip[d.id]) and not (db.dTaken and db.dTaken[d.id]) then
-      out[#out + 1] = { (L["Dungeon %s fits your level (%d quests): /lvd dungeon to plan it, /lvd dungeon no to skip"]):format(d.n, #d.quests), "accent" }
+      out[#out + 1] = { (L["Dungeon %s fits your level (%d quests): /lvd dungeon to plan it, /lvd dungeon no to skip"]):format(ns.DgName(d.id, d.n), #d.quests), "accent" }
       break
     end
   end
@@ -2357,6 +2831,19 @@ end
 
 ns.LeveldonHints = function() return Hints(STEPS[cur]) end -- (tests)
 
+-- (15.10., Daniel's mage Zip: "Book Return is an elite quest, hard alone if nobody helps") a bonus chain with /lvd
+-- solo on ends before its first group or escort quest (what follows needs it); without solo the steps say
+-- "(group quest)"
+function ns.SoloChain(chain)
+  if not (db and db.solo) then return chain end
+  local out = {}
+  for _, c in ipairs(chain) do
+    if c.grp or c.esc then break end
+    out[#out + 1] = c
+  end
+  return out
+end
+
 -- (0.1.3, Daniel 09.10.) a looted item starts a quest with a chain behind it that the route left out
 -- (a lucky drop): the chain goes in right after the current step
 local function PlanBonus(root, label)
@@ -2365,9 +2852,9 @@ local function PlanBonus(root, label)
   local at = 1
   for j = cur, 1, -1 do if STEPS[j] and STEPS[j]._i then at = STEPS[j]._i break end end
   table.insert(db.bonusPlans, { q = root, at = at })
-  local here = STEPS[cur]
+  local here, old, at = STEPS[cur], STEPS, cur
   Compose()
-  for j, s in ipairs(STEPS) do if s == here then cur = j break end end
+  cur = ns.RefindCur(here, old, at)
   print((L["|cff3fa9f5Level|rdon: \"%s\" is in your route now, along the way."]):format(label or "?"))
   return true
 end
@@ -2401,14 +2888,14 @@ local function CheckStarters()
           local at = 1
           for j = cur, 1, -1 do if STEPS[j] and STEPS[j]._i then at = STEPS[j]._i break end end
           table.insert(db.bonusPlans, { q = qid, at = at })
-          local here = STEPS[cur]
+          local here, old, at = STEPS[cur], STEPS, cur
           Compose()
-          for j, s in ipairs(STEPS) do if s == here then cur = j break end end
+          cur = ns.RefindCur(here, old, at)
           -- (12.10., Daniel in Northshire: "after the book dropped Leveldon sent me to the Brotherhood, I still had
           -- wolves to kill") the book's accept comes here, before the step you are on (it takes a click); the
           -- route goes on from that step afterwards instead of jumping past it
           for j = cur + 1, #STEPS do
-            if STEPS[j].q == qid and STEPS[j].k == "accept" then table.insert(STEPS, cur, table.remove(STEPS, j)) break end
+            if STEPS[j].q == qid and STEPS[j].k == "accept" then table.insert(STEPS, cur, table.remove(STEPS, j)) STEPS[cur]._pulled = ns._composeId break end
           end
           print((L["|cff3fa9f5Level|rdon: lucky find, \"%s\" starts a quest chain: it is in your route now."]):format(ROUTE.bonus[qid][1].n or "?"))
           Update(false)
@@ -2549,16 +3036,16 @@ function TravelTick()
   local a = API()
   if not (a and a.DistanceTo) then return end
   local here = Map()
-  for i, L in ipairs(ROUTE.links or {}) do
-    for side, e in ipairs({ L.a, L.b }) do
+  for i, lk in ipairs(ROUTE.links or {}) do   -- (15.10., review round 1: "L" hid the texts, the line threw)
+    for side, e in ipairs({ lk.a, lk.b }) do
       if e.m == here then
         local d = a.DistanceTo(e.m, e.x / 100, e.y / 100)
         if type(d) == "number" and d < TRAVEL_R then
           if dock and dock.i == i and dock.side ~= side then
             if now - dock.left < 1800 then
-              LogTravel({ k = L.k, link = i, from = dock.side, s = math.floor(now - dock.left + 0.5),
+              LogTravel({ k = lk.k, link = i, from = dock.side, s = math.floor(now - dock.left + 0.5),
                 w = math.floor(dock.left - dock.arrived + 0.5), d = time() })
-              print((L["|cff3fa9f5Level|rdon: %s took %d s (waited %d s), noted for /lvd export."]):format(L.k, now - dock.left, dock.left - dock.arrived))
+              print((L["|cff3fa9f5Level|rdon: %s took %d s (waited %d s), noted for /lvd export."]):format(L[lk.k], now - dock.left, dock.left - dock.arrived))
             end
             dock = { i = i, side = side, arrived = now, left = now }
           elseif dock and dock.i == i and dock.side == side then
@@ -2700,6 +3187,13 @@ local profsPanel, picked
 local function ApplyProfs(set, none)
   db.profs = {}
   for sk in pairs(set) do db.profs[sk] = true end
+  -- (15.10., review round 1) a profession you know but did not pick stays out (a skill event put it back in)
+  db.profsOff = nil
+  for _, list in ipairs({ PRIMARY, SECONDARY }) do
+    for _, sk in ipairs(list) do
+      if not set[sk] and SkillRank(sk) then db.profsOff = db.profsOff or {} db.profsOff[sk] = true end
+    end
+  end
   db.noProfs = none and true or nil
   local at, here, hereK, old = cur, STEPS[cur], STEPS[cur] and STEPS[cur].k, STEPS
   Compose()
@@ -2712,10 +3206,13 @@ local function ApplyProfs(set, none)
     if not found then
       for j = math.max(1, at - 3), math.min(#STEPS, at + 3) do if STEPS[j].k == "profs" then found = j + 1 break end end
     end
-    if not found then for k = at + 1, #old do found = IndexIn(STEPS, old[k]) if found then break end end end
+    -- (15.10., review round 3, H3: undead warlock's turn-in of 364 passed, Tainted Scroll blocked) the first of the
+    -- steps after the choice in the new order, the new profession steps after the choice too
+    local after = ns.RefindCur(nil, old, at + 1)
+    if not found or after < found then found = after end
   else
     -- (0.1.6) chosen early (after the first quest): the route stays at its step, or the next one still in it
-    for k = at, #old do found = IndexIn(STEPS, old[k]) if found then break end end
+    found = ns.RefindCur(here, old, at)
   end
   cur = found or math.min(at, #STEPS + 1)
   if profsPanel then profsPanel:FadeOut() end
@@ -2852,7 +3349,7 @@ function ns.CheckLearnedProfs()
   for sk in pairs(db.profs or {}) do set[sk] = true end
   for _, list in ipairs({ PRIMARY, SECONDARY }) do
     for _, sk in ipairs(list) do
-      if SkillRank(sk) and not set[sk] then set[sk] = true added[#added + 1] = ns.PName(sk) end
+      if SkillRank(sk) and not set[sk] and not (db.profsOff and db.profsOff[sk]) then set[sk] = true added[#added + 1] = ns.PName(sk) end
     end
   end
   if #added == 0 then return false end
@@ -3033,7 +3530,11 @@ local function Refresh()
   local kind = Kind(s)
   local main = Style.Row(panel):SetMain(true):SetActive(true):SetText(StepText(s), B.textPrimary or "textPrimary")
   main:SetIcon(s and KIND_ICON[kind] or KIND_ICON.chapter, false, kind ~= "accept" and kind ~= "turnin" or nil)
-  main:SetOnClick(s and s.k == "profs" and ShowProfs or (s and s.q and function() ns.OpenQuest(s) end) or nil)
+  -- (0.2.3) right-click: the menu with skip this step, skip this quest
+  local left = s and s.k == "profs" and ShowProfs or (s and s.q and function() ns.OpenQuest(s) end) or nil
+  main:SetOnClick(s and function(self, button)
+    if button == "RightButton" then ns.SM.Show() elseif left then left(self, button) end
+  end or nil)
   if Win then Win.Line(main, "now") pcall(Win.Now, main) end
   local m, x, y = Place(cur)
   if s and s.k == "die" and s.gm and s.gx then m, x, y = s.gm, s.gx, s.gy end -- (12.10.) the spirit healer
@@ -3076,7 +3577,7 @@ local function Refresh()
     local isCh = n.k == "chapter"
     -- (playtest 1) a buy without the money is not "next": it waits (see the hint)
     if isCh or (not StepDone(j) and not Outgrown(n) and not (n.k == "buy" and ns.BuyWaits(j))) then
-      if shown == 0 and not Win then Style.Header(panel, "Next") end
+      if shown == 0 and not Win then Style.Header(panel, L["Next"]) end
       local prevEl
       for k = j - 1, cur, -1 do if STEPS[k] and STEPS[k].el then prevEl = STEPS[k].el break end end
       if Win and prevEl and prevEl >= nextLv then Win.Milestone(panel, nextLv) nextLv = math.floor(prevEl) + 1 end
@@ -3122,7 +3623,11 @@ function ns.LF.ClassNow()
   local first, g1
   for j = cur, math.min(#STEPS, cur + 400) do
     local t = STEPS[j]
-    if t.k == "accept" and t.q and not QuestDone(t.q) and not InLog(t.q) and not (ns._acceptSkipped and ns._acceptSkipped[t.q]) then
+    -- (15.10., review round 1) not from far ahead (the human warrior's level 33 chain out of the 30 to 60 preview at
+    -- level 23) and not a grey one (a druid's level 14 quest at 23, put first and dropped again)
+    if t.k == "accept" and (t.el or 0) > Level() + (t._pv and 2 or 6) then break end
+    if t.k == "accept" and t.q and not QuestDone(t.q) and not InLog(t.q) and not (ns._acceptSkipped and ns._acceptSkipped[t.q])
+        and not Outgrown(t) then
       local g = a.GetQuest(t.q)
       local min = g and tonumber(g.minLevel)
       if min and min >= ns.LF.CLASS_MIN and min <= Level() and ns.LF.Mine(g, classID)
@@ -3147,7 +3652,19 @@ function ns.LF.ClassNow()
   end
   local moved = {}
   for n = #idx, 1, -1 do table.insert(moved, 1, table.remove(STEPS, idx[n])) end
-  for n, t in ipairs(moved) do table.insert(STEPS, at + n - 1, t) end
+  for n, t in ipairs(moved) do table.insert(STEPS, at + n - 1, t) t._pulled = ns._composeId end   -- (review round 3)
+  -- (review round 4) and kept when the steps are built again (a /reload put the class chain back at its place, the
+  -- step changed): in front of the same route step
+  local nextRi
+  for j = at + #moved, math.min(#STEPS, at + #moved + 20) do
+    local t = STEPS[j]
+    if t and t._i and t._pulled ~= ns._composeId then nextRi = t._i break end
+  end
+  if nextRi and db then
+    db.pullMoves = db.pullMoves or {}
+    for _, t in ipairs(moved) do if t.q then db.pullMoves[t.q] = nextRi end end
+    db.laterKey = tostring(db.route) .. ":" .. tostring(db.dungeons)
+  end
   ns._classNowSaid = ns._classNowSaid or {}
   if not ns._classNowSaid[moved[1].q] then
     ns._classNowSaid[moved[1].q] = true
@@ -3168,7 +3685,8 @@ function ns.LF.FollowPlayer()
   if Now() - ns.LF.since < ns.LF.SECONDS then return false end
   -- not while you work on the step itself (its kills, a skill, a grind): quests you pick up meanwhile are no sign
   local s0 = STEPS[cur]
-  if s0 and ((s0.k == "do" and s0.q and InLog(s0.q)) or s0.k == "grind" or s0.k == "skillup" or s0.k == "farm" or s0.k == "dungeon") then return false end
+  -- (15.10., review round 1) an unfinished quest's turn-in (shown as Do) too
+  if s0 and ((Kind(s0) == "do" and s0.q and InLog(s0.q)) or s0.k == "grind" or s0.k == "skillup" or s0.k == "farm" or s0.k == "dungeon") then return false end
   local first, hits, seen = nil, 0, {}
   for j = cur + 1, math.min(#STEPS, cur + 120) do
     local t = STEPS[j]
@@ -3181,15 +3699,30 @@ function ns.LF.FollowPlayer()
   local to = first
   while STEPS[to] and StepDone(to) do to = to + 1 end
   ns._acceptSkipped = ns._acceptSkipped or {}
+  -- (15.10., review round 1) a quest still in your log keeps its do and turn-in: they come right behind the step
+  -- the route goes on at, not marked done behind it
+  local keep = {}
   for k = cur, to - 1 do
     local t = STEPS[k]
     if not StepDone(k) then
-      marks[k] = true
-      if t.k == "accept" and t.q and not InLog(t.q) then ns._acceptSkipped[t.q] = true end
+      if t.q and (t.k == "do" or t.k == "turnin") and InLog(t.q) then
+        keep[#keep + 1] = t
+      else
+        marks[t] = true
+        if t.k == "accept" and t.q and not InLog(t.q) then
+          ns._acceptSkipped[t.q] = true
+          if db then db.skipAcc = db.skipAcc or {} db.skipAcc[t.q] = true end   -- (review round 2) after a /reload too
+        end
+      end
     end
   end
   ns._recHow = "f"
   if ns.RecEvent then pcall(ns.RecEvent, "C", 0, cur, to) end
+  for _, t in ipairs(keep) do
+    local j = IndexIn(STEPS, t)
+    if j then table.remove(STEPS, j) to = to - 1 end
+  end
+  for n, t in ipairs(keep) do table.insert(STEPS, to + n, t) end
   cur = to
   ns.SaveStep()
   print((L["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."]):format(STEPS[cur] and (ns.QName(STEPS[cur]) or STEPS[cur].n) or "?"))
@@ -3197,20 +3730,76 @@ function ns.LF.FollowPlayer()
   return true
 end
 ns.LeveldonFollow = ns.LF.FollowPlayer -- (tests)
+-- (15.10., review round 3, H2: a player one level behind the plan lost 6 to 39 accepts and their chains, Call of
+-- Earth among them) an accept left out for its level comes back once the level is there: at the next visit of its
+-- giver before its kill step or turn-in ahead (not one you skipped by hand)
+ns.ReturnLeftOut = function()
+  if not ns._acceptSkipped then return end
+  local back = 0
+  for q in pairs(ns._acceptSkipped) do
+    if not (db and db.skipAcc and db.skipAcc[q]) and not InLog(q) and not QuestDone(q) and not (ns.TooLowFor and ns.TooLowFor(q))
+        and not Blocked(q) then
+      local ja, jd
+      for j = 1, cur - 1 do if STEPS[j].k == "accept" and STEPS[j].q == q then ja = j end end
+      for j = cur, #STEPS do local t = STEPS[j] if t.q == q and (t.k == "do" or t.k == "turnin") then jd = j break end end
+      if ja and jd then
+        ns._acceptSkipped[q] = nil
+        local s = table.remove(STEPS, ja)
+        cur, jd = cur - 1, jd - 1
+        local to = jd
+        for j = cur, jd - 1 do
+          local t = STEPS[j]
+          if NPC_KIND[t.k] and s.m and Within(t, s, NEAR.hub) then to = j + 1 break end
+        end
+        table.insert(STEPS, to, s)
+        marks[s] = nil
+        -- (review round 4) kept there when the steps are built again
+        s._movedLater = ns._composeId
+        for j = to - 1, 1, -1 do
+          if STEPS[j]._i then ns.LaterMove(q, STEPS[j]._i) break end
+        end
+        back = back + 1
+      end
+    end
+  end
+  if back > 0 then ns.SaveStep() Update(false) end
+  return back
+end
+ns.LeveldonKind = function(i) return Kind(STEPS[i]) end -- (tests) a step as shown: an unfinished turn-in is a "do"
 ns.LeveldonFollowClock = function(t) ns.LF.since = t end -- (tests)
 
 function Update(initial)
+  if not panel then return end   -- (15.10., review round 1) an event before PLAYER_LOGIN: nothing to update or save yet
   local before = cur
+  -- (15.10., review round 1) when your home changed (a bind step done a moment early), kept over a /reload
+  if db and GetBindLocation then
+    local home = GetBindLocation()
+    if home and db.homeLast and home ~= db.homeLast and GetTime then db.homeAt = GetTime() end
+    if home then db.homeLast = home end
+  end
   if ns.CheckHub then pcall(ns.CheckHub) end
   if ns.CheckSell then pcall(ns.CheckSell) end
-  Advance(initial)
-  if not initial and not (ns._held and ns._held.i == cur) then   -- (13.10.) a held step: no jumps either
+  local behind = initial and not ns._restored
+  if initial then ns._restored = nil end
+  Advance(behind)
+  if ns._replan and C_Timer then
+    ns._replan = nil
+    C_Timer.After(0, function() if ns.LeveldonRecompose then pcall(ns.LeveldonRecompose) end end)
+  end
+  if not initial and not (ns._held and ns._held.s == STEPS[cur]) then   -- (13.10.) a held step: no jumps either
     pcall(ns.LF.ClassNow)
     local ok, moved = pcall(ns.LF.FollowPlayer)
     if ok and moved then Advance(false) end
+    -- (15.10., review round 1: Fit.lua's "finish what is around you first" was never called) a kill step with an
+    -- open objective right here comes before walking away
+    if ns.FinishNearbyFirst then pcall(ns.FinishNearbyFirst, STEPS, cur) end
+    -- (15.10., review round 4) saved with what ClassNow or FinishNearbyFirst just put here: a /reload before the next
+    -- save went back to the step before the pull
+    ns.SaveStep()
   end
-  if STEPS[cur] and STEPS[cur].k == "bind" and bindAtStep == nil then
-    bindAtStep = GetBindLocation and GetBindLocation() or false
+  if db and db.mountLater then pcall(ns.MountReminder) end   -- (review round 1) reached level 40 with the gold
+  if STEPS[cur] and STEPS[cur].k == "bind" and not (bindAtStep and bindAtStep.s == STEPS[cur]) then
+    bindAtStep = { s = STEPS[cur], at = GetBindLocation and GetBindLocation() or false }
   end
   -- (0.1.4, Daniel 09.10.: no arrow after choosing professions) the steps were rebuilt under the same
   -- number: a new step object needs the arrow too
@@ -3239,20 +3828,47 @@ end
 local function Skip(delta)
   ns._recHow = delta > 0 and "s" or "b" -- (0.1.7) the recorder notes skipped and back
   local from = STEPS[cur]
+  -- (review round 4) a waiting buy skipped by hand does not come back three steps later
+  if delta > 0 and from and from._later and db and db.buyLater then db.buyLater[from.i] = nil end
   if delta > 0 and DropLater(cur) then delta = delta - 1 end
   cur = math.max(1, math.min(#STEPS + 1, cur + delta))
-  if delta > 0 then marks[cur - 1] = true end
-  if delta < 0 then marks[cur] = nil end
+  -- (15.10., review round 3) back onto a chapter header (a title, no step): the step before it
+  if delta < 0 and STEPS[cur] and STEPS[cur].k == "chapter" and cur > 1 then cur = cur - 1 end
+  if delta > 0 and STEPS[cur - 1] then
+    marks[STEPS[cur - 1]] = true
+    local t = STEPS[cur - 1]
+    if db and not t._i and (t.k == "buy" or t.k == "learn" or t.k == "train" or t.k == "skillup") then
+      db.skipKeys = db.skipKeys or {}
+      db.skipKeys[ns.StepKey(t)] = true
+    end
+  end
+  if delta < 0 and STEPS[cur] then
+    marks[STEPS[cur]] = nil
+    if db and db.skipKeys then db.skipKeys[ns.StepKey(STEPS[cur])] = nil end
+  end
   -- (13.10.) back: this step is held (Advance); forward ends the hold
-  if delta < 0 then ns._held = { i = cur, wasDone = StepDone(cur) } else ns._held = nil end
+  -- (15.10., review round 2) held by the step itself: a vendor stop put in at its number is not held
+  if delta < 0 then ns._held = { s = STEPS[cur], wasDone = StepDone(cur) } else ns._held = nil end
   -- (11.10., Daniel: The Adventurer reported "giver not there", then Leveldon wanted it turned in: "I don't have
   -- the quest") an accept skipped without the quest: its do and turn-in steps go by too (StepDone), back undoes it
   ns._acceptSkipped = ns._acceptSkipped or {}
   if delta > 0 and from and from.k == "accept" and from.q and not InLog(from.q) and not QuestDone(from.q) then
     ns._acceptSkipped[from.q] = true
+    -- (15.10., review round 1) kept over a /reload (per route: db.skipAcc goes with db.route)
+    if db then db.skipAcc = db.skipAcc or {} db.skipAcc[from.q] = true end
   elseif delta < 0 and STEPS[cur] and STEPS[cur].k == "accept" and STEPS[cur].q then
     ns._acceptSkipped[STEPS[cur].q] = nil
+    if db and db.skipAcc then db.skipAcc[STEPS[cur].q] = nil end
   end
+  -- (0.2.3) back onto a step of a quest skipped by hand: the quest is back
+  if delta < 0 and STEPS[cur] and STEPS[cur].q and db and db.skipQ then db.skipQ[STEPS[cur].q] = nil end
+  -- (15.10., review round 4) the quest skipped last, also when done steps lie between: back to its step
+  if delta < 0 and ns._lastSkipQ and db and db.skipQ and db.skipQ[ns._lastSkipQ.q] then
+    db.skipQ[ns._lastSkipQ.q] = nil
+    local j = IndexIn(STEPS, ns._lastSkipQ.s)
+    if j then cur = j ns._held = { s = STEPS[cur], wasDone = StepDone(cur) } end
+  end
+  if delta > 0 then ns._lastSkipQ = nil end
   bindAtStep = nil
   ns.SaveStep()
   if delta > 0 then Advance(false) end
@@ -3264,14 +3880,122 @@ end
 ns.LeveldonRefresh = function() if panel then Refresh() end end -- (0.1.7 Resize.lua)
 -- (0.1.7 Fit.lua) the steps built again, the current step kept
 ns.LeveldonRecompose = function()
-  local here = STEPS[cur]
+  local here, old, at = STEPS[cur], STEPS, cur
   Compose()
-  for j, s in ipairs(STEPS) do if s == here then cur = j break end end
-  if ns._held then ns._held.i = cur end
+  cur = ns.RefindCur(here, old, at)
   ns.SaveStep()
   Update(false)
 end
-ns.LeveldonSkip = function(delta) Skip(delta) end -- (0.1.7 Report.lua: after a report the next step)
+ns.LeveldonSkip = function(delta) Skip(delta) end
+-- (15.10., review round 2) skip that step, even when another came before it meanwhile (a vendor stop while you wrote
+-- a report); the route stays at the step it is on
+ns.LeveldonSkipStep = function(obj)
+  local j = obj and IndexIn(STEPS, obj)
+  if not j then return Skip(1) end
+  local was = STEPS[cur]
+  cur = j
+  Skip(1)
+  if was and was ~= obj then
+    local w = IndexIn(STEPS, was)
+    if w and w < cur and not StepDone(w) then cur = w ns.SaveStep() Refresh() end
+  end
+end -- (0.1.7 Report.lua: after a report the next step)
+
+-- (0.2.3, Daniel 13.10.: "right-click on the current quest with the option skip") a small menu on the current
+-- step: skip this step (as the arrow button), or skip the whole quest: all its steps go by (taking, doing, handing
+-- in, buying for it), kept per character in db.skipQ; a step back onto one of its steps brings the quest back
+ns.SM = {}
+function ns.SM.Action(what)
+  local s = STEPS[cur]
+  if what == "step" then
+    Skip(1)
+  elseif what == "quest" and s and s.q and db then
+    db.skipQ = db.skipQ or {}
+    db.skipQ[s.q] = true
+    ns._lastSkipQ = { q = s.q, s = s }   -- (review round 4) one step back brings it back, wherever the route went on
+    ns._recHow, ns._held = "s", nil
+    bindAtStep = nil
+    print((L["|cff3fa9f5Level|rdon: \"%s\" skipped. One step back brings it back."]):format(ns.QName(s) or s.n or tostring(s.q)))
+    Advance(false)
+    ns.SaveStep()
+    Arrow()
+    pcall(MarkTick)
+    Refresh()
+  end
+  if ns.SM.menu then ns.SM.menu:Hide() end
+end
+function ns.SM.Row(parent)
+  local r = CreateFrame("Button", nil, parent)
+  r:SetHeight(22)
+  r.hover = r:CreateTexture(nil, "BACKGROUND")
+  r.hover:SetAllPoints(r)
+  r.hover:SetColorTexture(1, 1, 1, 0.07)
+  r.hover:Hide()
+  r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  r.text:SetPoint("LEFT", r, "LEFT", 8, 0)
+  r.text:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+  r.text:SetJustifyH("LEFT")
+  r:SetScript("OnEnter", function(self) self.hover:Show() end)
+  r:SetScript("OnLeave", function(self) self.hover:Hide() end)
+  return r
+end
+function ns.SM.Show()
+  local s = STEPS[cur]
+  if not s then return end
+  local m = ns.SM.menu
+  if not m then
+    local c = CreateFrame("Button", nil, UIParent)
+    c:SetAllPoints(UIParent)
+    c:SetFrameStrata("DIALOG")
+    if c.RegisterForClicks then c:RegisterForClicks("AnyUp") end
+    c:SetScript("OnClick", function() if ns.SM.menu then ns.SM.menu:Hide() end end)
+    m = CreateFrame("Frame", "LeveldonStepMenu", UIParent)
+    m.catcher = c
+    m:SetFrameStrata("DIALOG")
+    local lvl = c.GetFrameLevel and tonumber(c:GetFrameLevel())
+    if lvl and m.SetFrameLevel then m:SetFrameLevel(lvl + 10) end
+    m:SetWidth(220)
+    m:EnableMouse(true)
+    m:SetClampedToScreen(true)
+    local bg = m:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(m)
+    bg:SetColorTexture(0.10, 0.11, 0.22, 0.97)
+    m.title = m:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    m.title:SetPoint("TOPLEFT", m, "TOPLEFT", 10, -8)
+    m.title:SetPoint("RIGHT", m, "RIGHT", -10, 0)
+    m.title:SetJustifyH("LEFT")
+    m.rows = { ns.SM.Row(m), ns.SM.Row(m) }
+    for k, r in ipairs(m.rows) do
+      r:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -28 - (k - 1) * 22)
+      r:SetPoint("TOPRIGHT", m, "TOPRIGHT", -4, -28 - (k - 1) * 22)
+    end
+    if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "LeveldonStepMenu") end
+    m:SetScript("OnHide", function(self) self.catcher:Hide() end)
+    ns.SM.menu = m
+  end
+  m.title:SetText(StepText(s))
+  local items = { { "step", L["Skip this step"] } }
+  if s.q then items[2] = { "quest", L["Skip this quest"] } end
+  for k, r in ipairs(m.rows) do
+    local it = items[k]
+    if it then
+      r.text:SetText(it[2])
+      r:SetScript("OnClick", function() ns.SM.Action(it[1]) end)
+      r:Show()
+    else
+      r:Hide()
+    end
+  end
+  m.items = #items
+  m:SetHeight(28 + #items * 22 + 8)
+  local x, y = 0, 0
+  if GetCursorPosition then x, y = GetCursorPosition() end
+  local sc = UIParent.GetEffectiveScale and tonumber(UIParent:GetEffectiveScale()) or 1
+  m:ClearAllPoints()
+  m:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x or 0) / sc - 8, (y or 0) / sc + 8)
+  m.catcher:Show()
+  m:Show()
+end
 local function Build()
   panel = Style.Panel("LeveldonPanel", UIParent, {
     look = "book", media = "Interface\\AddOns\\Leveldon\\Media\\",
@@ -3279,7 +4003,7 @@ local function Build()
     width = 360, close = true, collapse = true, get = Get, set = Set,
     defaultPoint = { "TOPRIGHT", "TOPRIGHT", -260, -260 },
     buttons = {
-      { kind = "forward", key = "next", onClick = function() Skip(1) end, tooltip = { L["Skip this step"], nil, "/lvd next" } },
+      { kind = "forward", key = "next", onClick = function() Skip(1) end, tooltip = { L["Skip this step"], { L["Right-click the step: skip it or the whole quest."] }, "/lvd next" } },
       { kind = "back", key = "back", onClick = function() Skip(-1) end, tooltip = { L["One step back"], nil, "/lvd back" } },
       -- (0.1.7, Daniel 11.10.) report this step: quest giver not there, route makes no sense, a remark
       { kind = "report", key = "report", onClick = function() if ns.OpenReport then ns.OpenReport() end end,
@@ -3310,6 +4034,11 @@ local function Soon()
 end
 
 f:SetScript("OnEvent", function(_, event, ...)
+  -- (15.10., review round 3) Questdon's "cannot take" can change: a quest handed in, a skill learned, a level
+  if event == "QUEST_TURNED_IN" or event == "SKILL_LINES_CHANGED" or event == "PLAYER_LEVEL_UP" then
+    for k in pairs(blocked) do blocked[k] = nil end
+  end
+  if (event == "PLAYER_LEVEL_UP" or event == "QUEST_TURNED_IN") and C_Timer then C_Timer.After(1, function() pcall(ns.ReturnLeftOut) end) end
   if event == "ADDON_LOADED" then
     -- (0.1.6) the quest log of the map (or the classic one) may come with a Blizzard addon later
     if ... ~= addonName then if db then pcall(MakeLogButton) end return end
@@ -3331,16 +4060,29 @@ f:SetScript("OnEvent", function(_, event, ...)
     local key = (ROUTE.race or "?") .. ":" .. (ROUTE.cls or "?") .. ":" .. #ROUTE.steps
     local remap
     if db.route ~= key then
-      if type(db.route) == "string" and db.route:match("^[^:]*:[^:]*") ~= key:match("^[^:]*:[^:]*") then db.run = nil
+      local other = type(db.route) == "string" and db.route:match("^[^:]*:[^:]*") ~= key:match("^[^:]*:[^:]*")
+      if other then db.run = nil
       elseif db.stepK and db.stepQ then remap = { k = db.stepK, q = db.stepQ } end -- (13.10.) a new build: same quest step
-      db.route, db.step = key, nil
+      -- (15.10., review round 2) a new build (or the dungeon switch) keeps the accepts you skipped (quest IDs stay);
+      -- another race or class does not
+      if other or type(db.route) ~= "string" then db.skipAcc, ns._acceptSkipped = nil, nil end
+      db.route, db.step, db.laterMoves, db.pullMoves = key, nil, nil, nil   -- (review round 4) moves by route index
+    end
+    -- (15.10., review round 1) accepts skipped by hand on this route, also after a /reload
+    if db.skipAcc then
+      ns._acceptSkipped = ns._acceptSkipped or {}
+      for q in pairs(db.skipAcc) do ns._acceptSkipped[q] = true end
     end
     -- (13.10.) the recording session started on the same event may have read the route before it was loaded
     local rs = ns.RecSession and ns.RecSession()
     if rs then rs.route, rs.rid = db.route, ns.LeveldonRouteId() end
     Compose()
     Build()
-    cur = ns.RestoreStep() or StartIndex()
+    local restored = ns.RestoreStep()
+    cur = restored or StartIndex()
+    -- (15.10., review round 2) the step you logged out on stays: the first update does not pass a pending inn,
+    -- flight point or trainer because a later quest of the chapter is in your log (that is for a first start)
+    ns._restored = restored ~= nil or remap ~= nil
     if remap then
       for j, t in ipairs(STEPS) do if t.k == remap.k and t.q == remap.q then cur = j break end end
       ns.SaveStep()
@@ -3361,19 +4103,39 @@ f:SetScript("OnEvent", function(_, event, ...)
     C_Timer.NewTicker(2, function()
       pcall(TravelTick)
       if STEPS[cur] and Kind(STEPS[cur]) == "do" then pcall(MarkUsed, STEPS[cur].q) pcall(Arrow) end
+      -- (15.10., Zip at Mirror Lake: "arrow still pointing to Mirror Lake") a turn-in's place asked again: right
+      -- after the objective Questdon may still give the objective's spot (its map points are rebuilt a moment later)
+      if STEPS[cur] and Kind(STEPS[cur]) == "turnin" then pcall(Arrow) end
     end)
   elseif event == "TAXIMAP_OPENED" then
     pcall(RecordIndoor)
     pcall(MarkInteract)
-    if STEPS[cur] and STEPS[cur].k == "fp" then marks[cur] = true end
+    if STEPS[cur] and STEPS[cur].k == "fp" then marks[STEPS[cur]] = true end
+    -- (15.10., review round 1) talked to the flight master a step early: its fp step close ahead and here goes by too
+    local x, y = ns.PlayerXY()
+    for j = cur + 1, math.min(#STEPS, cur + 4) do
+      local t = STEPS[j]
+      if t.k == "fp" and x and t.m == Map() and t.x and Within({ m = t.m, x = x, y = y }, t, 400) then marks[t] = true end
+    end
     Soon()
   elseif event == "TRAINER_SHOW" then
     pcall(RecordIndoor)
     pcall(MarkInteract)
-    if STEPS[cur] and STEPS[cur].k == "train" then marks[cur] = true end
     -- (0.1.4) the class trainer: what this level brings is learned, later trainer stops up to it are done
-    if db and not (IsTradeskillTrainer and IsTradeskillTrainer()) then db.trained = math.max(db.trained or 0, Level()) end
+    if db and not (IsTradeskillTrainer and IsTradeskillTrainer()) and ns.TR.IsClassTrainer() then
+      -- (15.10., review round 2) only your class trainer's window does the step (a profession or pet trainer not)
+      if STEPS[cur] and STEPS[cur].k == "train" then marks[STEPS[cur]] = true end
+      pcall(ns.TR.Recommend)
+      db.trained = math.max(db.trained or 0, Level())
+      -- (15.10., review round 1) the trainer steps ahead planned again: what you could not pay here (5 copper)
+      -- is recommended at the next visit; again when the window closes, with what you bought
+      if ns.LeveldonRecompose then pcall(ns.LeveldonRecompose) end
+      ns._trainerOpen = true
+    end
     Soon()
+  elseif event == "TRAINER_CLOSED" then
+    if ns._trainerOpen and ns.LeveldonRecompose then pcall(ns.LeveldonRecompose) end
+    ns._trainerOpen = nil
   elseif event == "CHAT_MSG_SYSTEM" then
     pcall(OnSystemMessage, (...))
     Soon()
@@ -3383,11 +4145,21 @@ f:SetScript("OnEvent", function(_, event, ...)
   elseif event == "CHAT_MSG_LOOT" then
     local msg = ...
     CheckKeep(msg)
+  elseif event == "PLAYER_MONEY" then
+    pcall(ns.MountReminder)
+  elseif event == "CHARACTER_POINTS_CHANGED" then
+    -- (15.10., review round 1) a talent point spent: the trainer steps ahead recommend by your talents again
+    if ns.LeveldonRecompose then pcall(ns.LeveldonRecompose) end
   elseif event == "BAG_UPDATE_DELAYED" then
     pcall(CheckStarters)
+    -- (15.10., Daniel's mage Zip: "bought 1 stack and it does not go on") a buy step is done once the items are in
+    -- the bags: buying sends no quest event, so the step waited for the next one
+    Soon()
   elseif event == "QUEST_ACCEPTED" then
     local a1, a2 = ...
     ns.NoteQuestEvent(tonumber(a2) or tonumber(a1)) -- (13.10.) FollowPlayer: quests taken while the step waits
+    -- (15.10., review round 1) taken again: a second abandon brings its accept back again (RetakeBefore)
+    if ns._retaken then ns._retaken[tonumber(a2) or tonumber(a1) or 0] = nil end
     pcall(OnFirstAccept)
     pcall(CheckLogChains)
     Soon()
@@ -3401,7 +4173,7 @@ f:SetScript("OnEvent", function(_, event, ...)
     Soon()
   elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
     -- (11.10.) alive again (the spirit healer, or back at the corpse): a "die" step is done
-    if STEPS[cur] and STEPS[cur].k == "die" and (event == "PLAYER_UNGHOST" or not (UnitIsDeadOrGhost and UnitIsDeadOrGhost("player"))) then marks[cur] = true end
+    if STEPS[cur] and STEPS[cur].k == "die" and (event == "PLAYER_UNGHOST" or not (UnitIsDeadOrGhost and UnitIsDeadOrGhost("player"))) then marks[STEPS[cur]] = true end
     Soon()
   elseif event == "GOSSIP_SHOW" then
     pcall(RecordIndoor)
@@ -3423,8 +4195,11 @@ f:SetScript("OnEvent", function(_, event, ...)
     local sname = SpellName(spellID)
     if unit == "player" and sname and (sname == SpellName(818) or sname == SpellName(1229737)) then campAt = Now() end
     -- (12.10.) the sleeping bag used: the 2 hours of Well-Rested start
-    if unit == "player" and sname and GetItemSpell and sname == GetItemSpell(ns.Bag.item) then ns.Bag.at = Now() end
-    if unit == "player" and spellID == 8690 and STEPS[cur] and STEPS[cur].k == "hearth" then marks[cur] = true end
+    if unit == "player" and sname and GetItemSpell and sname == GetItemSpell(ns.Bag.item) then
+      ns.Bag.at = Now()
+      if db and time then db.bagAt = time() end
+    end
+    if unit == "player" and spellID == 8690 and STEPS[cur] and STEPS[cur].k == "hearth" then marks[STEPS[cur]] = true end
     Soon()
   else
     Soon()
@@ -3434,7 +4209,7 @@ for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "QUEST_ACCEPTED", "QUEST_TU
   "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "TAXIMAP_OPENED", "TRAINER_SHOW",
   "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_XP_UPDATE", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL", "CHAT_MSG_SYSTEM", "SPELLS_CHANGED", "MERCHANT_SHOW", "CHAT_MSG_LOOT", "BAG_UPDATE_DELAYED",
   "GOSSIP_SHOW", "PLAYER_REGEN_ENABLED", "UNIT_QUEST_LOG_CHANGED", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE",
-  "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
+  "PLAYER_ALIVE", "PLAYER_UNGHOST", "PLAYER_MONEY", "CHARACTER_POINTS_CHANGED", "TRAINER_CLOSED" }) do
   pcall(f.RegisterEvent, f, e)
 end
 
@@ -3474,7 +4249,7 @@ SlashCmdList.LEVELDON = function(msg)
       if lv >= d.lo and lv <= d.lo + 6 and not (db.dSkip and db.dSkip[d.id]) and not (db.dTaken and db.dTaken[d.id]) then
         if msg == "dungeon no" then
           db.dSkip = db.dSkip or {} db.dSkip[d.id] = true
-          print("|cff3fa9f5Level|rdon: " .. d.n .. L[" skipped."])
+          print("|cff3fa9f5Level|rdon: " .. ns.DgName(d.id, d.n) .. L[" skipped."])
         else
           db.dTaken = db.dTaken or {} db.dTaken[d.id] = true
           -- after the current step of the route (its index in the route itself)
@@ -3482,10 +4257,12 @@ SlashCmdList.LEVELDON = function(msg)
           for j = cur, 1, -1 do if STEPS[j] and STEPS[j]._i then at = STEPS[j]._i break end end
           db.dPlans = db.dPlans or {}
           table.insert(db.dPlans, { id = d.id, at = at })
+          -- (15.10., review round 3) the step you are on stays; the run's steps come right after it
+          local here, old, at0 = STEPS[cur], STEPS, cur
           Compose()
-          for j, s in ipairs(STEPS) do if s.dg == d.id then cur = j break end end
+          cur = ns.RefindCur(here, old, at0)
           Update(false)
-          print("|cff3fa9f5Level|rdon: " .. d.n .. L[" planned: pick up its quests, find a group, turn them in."])
+          print("|cff3fa9f5Level|rdon: " .. ns.DgName(d.id, d.n) .. L[" planned: pick up its quests, find a group, turn them in."])
         end
         break
       end
@@ -3494,23 +4271,36 @@ SlashCmdList.LEVELDON = function(msg)
     -- (12.10.) the route with the dungeons of your faction planned in (1 to 30), or without
     if msg ~= "dungeons" then db.dungeons = msg == "dungeons on" end
     if msg ~= "dungeons" then
+      local was = STEPS[cur]
       LoadRoute()
       Compose()
-      Build()
-      cur = StartIndex()
-      Update(true)
+      if not panel then Build() end   -- (15.10., review round 1) Build made a second window next to the old one
+      -- (15.10., review round 3) the same quest step in the other route, else the chapter's start as before
+      local again
+      if was then
+        -- (review round 4) a service step too (inn, trainer, flight point): by kind, name and level
+        for j, t in ipairs(STEPS) do
+          if t.k == was.k and t.q == was.q and (was.q or (t.n == was.n and t.lvl == was.lvl)) then again = j break end
+        end
+      end
+      cur = again or StartIndex()
+      Update(again == nil)
     end
     print("|cff3fa9f5Level|rdon: " .. (db.dungeons and L["dungeons planned in (/lvd dungeons off)"] or L["no dungeons (/lvd dungeons on)"])
       .. (db.dungeons and not ROUTE.withDungeons and L[", none planned for this character yet"] or "") .. ".")
   elseif msg == "solo" then
     db.solo = not db.solo
+    -- (15.10., review round 1) the current step kept by its object (group steps taken out moved it by their count);
+    -- a group step that goes: the next step that stays
+    -- (review round 4) through RefindCur: a hub trainer stop you are on stays, moved steps go back to their place
+    local here, old, at0 = STEPS[cur], STEPS, cur
     Compose()
-    cur = math.min(cur, #STEPS)
-    Update(true)
+    cur = math.min(ns.RefindCur(here, old, at0), #STEPS)
+    Update(false)   -- (review round 4) not the first-start pass over service steps
     print(L["|cff3fa9f5Level|rdon: solo "] .. (db.solo and L["on: no group and escort quests"] or L["off"]) .. ".")
   elseif msg == "back" then Skip(-1)
   elseif msg == "reset" then
-    marks, bindAtStep = {}, nil
+    marks, bindAtStep = setmetatable({}, { __mode = "k" }), nil
     cur = StartIndex()
     Update(true)
     print(L["|cff3fa9f5Level|rdon: route started again from your level."])
