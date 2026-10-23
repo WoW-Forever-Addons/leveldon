@@ -261,12 +261,12 @@ function ns.ApplyExtraPlans(out)
 end
 
 local turned = {}
-local f = CreateFrame("Frame")
+local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, e, a1, a2)
   if e == "QUEST_ACCEPTED" then
     local q = tonumber(a2) or tonumber(a1) -- (the old clients send the log index first)
     if q and C_Timer and C_Timer.After then
-      C_Timer.After(1, function()
+      ns.After(1, function()
         pcall(ns.FitIn, q) -- Questdon knows its places a moment later
         -- a timer the list did not know: timed from now on (this session), the steps again
         if not ns.TIMED_QUESTS[q] and ns.TimeLeft(q) then
@@ -288,7 +288,7 @@ f:SetScript("OnEvent", function(_, e, a1, a2)
         db.extraPlans[q] = nil
         if ns.LeveldonRecompose then ns.LeveldonRecompose() end
       end
-      if C_Timer and C_Timer.After then C_Timer.After(2, Drop) else Drop() end
+      if C_Timer and C_Timer.After then ns.After(2, Drop) else Drop() end
     end
   end
 end)
@@ -305,8 +305,8 @@ local function LogClassQuests()
   end
 end
 ns.LogClassQuests = LogClassQuests -- (tests)
-local g = CreateFrame("Frame")
-g:SetScript("OnEvent", function() if C_Timer and C_Timer.After then C_Timer.After(5, function() pcall(LogClassQuests) end) end end)
+local g = ns.CreateFrame("Frame")
+g:SetScript("OnEvent", function() if C_Timer and C_Timer.After then ns.After(5, function() pcall(LogClassQuests) end) end end)
 pcall(g.RegisterEvent, g, "PLAYER_LOGIN")
 
 ---------------------------------------------------------------------------

@@ -567,8 +567,15 @@ local function API() return QuestdonAPI end
 local function Level() return UnitLevel and UnitLevel("player") or 1 end
 local function Map() return C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") or nil end
 -- (11.10.) the player's position on the current map in percent, or nil
+-- (23.10., /lvd mem) Questdon's position first (UnitPosition, no table): C_Map.GetPlayerMapPosition makes a new vector
+-- with all of Vector2DMixin's functions at every call
 function ns.PlayerXY()
   local m = Map()
+  local a = QuestdonAPI
+  if m and a and a.PlayerPosition then
+    local ok, qm, qx, qy = pcall(a.PlayerPosition)
+    if ok and qm == m and type(qx) == "number" and type(qy) == "number" then return qx * 100, qy * 100 end
+  end
   local p = m and C_Map.GetPlayerMapPosition and C_Map.GetPlayerMapPosition(m, "player")
   if not (p and p.GetXY) then return nil end
   local x, y = p:GetXY()
@@ -671,9 +678,29 @@ local function CantAfford(i)
   local p, m = BUY_PRICE[i], Money()
   return p ~= nil and m ~= nil and m < p
 end
+-- (23.10., Daniel's Skyborne druid Lauranvilis 18.10.: "if fishing is skipped you do not need these", "what for?") the
+-- professions whose learning lies behind the current step, skipped (by hand, or gone by at the trainer) and not known:
+-- their buys, skill-ups and Camping 101 steps go by. The learn steps of the route are listed once per route.
+function ns.LearnPassed(sk)
+  local c = ns._lpc
+  if not c or c.steps ~= STEPS or c.n ~= #STEPS then
+    c = { steps = STEPS, n = #STEPS, at = {} }
+    for j, t in ipairs(STEPS) do
+      if t.k == "learn" and t.sk then c.at[#c.at + 1] = j end
+    end
+    ns._lpc = c
+  end
+  for _, j in ipairs(c.at) do
+    local t = STEPS[j]
+    if j >= cur then break end
+    if t.sk == sk and (marks[t] or (db and db.skipKeys and db.skipKeys[ns.StepKey(t)])) then return true end
+  end
+  return false
+end
 local function StepDone(i)
   local s = STEPS[i]
   if not s then return true end
+  if s.sk and s.k ~= "learn" and s.k ~= "profs" and s.k ~= "use" and ns.LearnPassed(s.sk) and SkillRank(s.sk) == nil then return true end
   if (s.k == "accept" or s.k == "do" or s.k == "turnin") and s.q and blocked[s.q] then return true end
   -- only for the current step: a later quest's prerequisite may still come before it on the route
   if i == cur and s.k == "accept" and s.q and Blocked(s.q) then
@@ -1095,6 +1122,10 @@ local function StepText(s, upcoming, short)
   elseif s.k == "grind" then
     return (L["Grind to level %d (about %d mobs)"]):format(s.to, s.kills or 0)
   elseif s.k == "die" then
+    -- (23.10., player Dorandy) not there yet: walk to the place first (the compass shows it)
+    if ns.DieWalkFirst(s) then
+      return (L["Shortcut: walk to the marked place, then let yourself die there. You come back at the spirit healer by %s, where the route goes on (no resurrection sickness below level 10)"]):format(s.n or "?")
+    end
     -- (Daniel 12.10.: "misleading: die here, or walk there first?") wherever you are now; the compass shows the
     -- spirit healer where you come back and the route goes on
     return (L["Shortcut: let yourself die where you are now. You come back at the spirit healer by %s, where the route goes on (no resurrection sickness below level 10)"]):format(s.n or "?")
@@ -1201,7 +1232,7 @@ local function NearestObjective(q)
     local d = a.DistanceTo(p.mapID, p.x, p.y)
     if type(d) == "number" then
       if not anyd or d < anyd then any, anyd = p, d end
-      local t = used[PointKey(p)]
+      local t = next(used) ~= nil and used[PointKey(p)] or nil -- (23.10.) no key string per place when none was used
       if not (t and now - t < USED_FOR) and (not bd or d < bd) then best, bd = p, d end
     end
   end
@@ -1242,7 +1273,7 @@ local function Arrow()
   end
   local m, x, y
   -- (12.10.) a death on purpose: the compass shows the spirit healer where you come back, not a place to walk to
-  if s.k == "die" and s.gm and s.gx then
+  if s.k == "die" and s.gm and s.gx and not ns.DieWalkFirst(s) then
     local t = { mapID = s.gm, x = s.gx / 100, y = s.gy / 100, label = StepText(s) }
     ns._arrowT = t
     a.SetArrowTarget(t)
@@ -1262,18 +1293,22 @@ local function Arrow()
     if pm then m, x, y = pm, px / 100, py / 100 end
   end
   local t = m and { mapID = m, x = x, y = y, label = StepText(s) } or nil
+  local old = ns._arrowT
   -- (0.1.7, Daniel 11.10.: "the arrow confuses when you are in the area killing the mobs") a do step brings
   -- its objective places: in their area Questdon shows "In the objective area" instead of the needle
   if t and Kind(s) == "do" and InLog(s.q) and a.ObjectivePoints then
-    local pts = {}
-    for _, p in ipairs(a.ObjectivePoints(s.q) or {}) do pts[#pts + 1] = { mapID = p.mapID, x = p.x, y = p.y } end
-    if #pts > 0 then t.area, t.questID, t.points = true, s.q, pts end
+    local src = a.ObjectivePoints(s.q) or {}
+    if #src > 0 then
+      -- (Daniel 11.10.: standing still it flipped between the needle and "In the objective area") the same
+      -- quest's area target stays as it is: Questdon picks the nearest spot in it, a new table every 2 s
+      -- with Leveldon's own spot made it jump. (23.10., /lvd mem: the tickers 62 KB a second) asked before the
+      -- points are copied: every 2 s a new table for each of the quest's places went straight to the bin
+      if old and old.area and old.questID == s.q and old.label == t.label and #old.points == #src then return end
+      local pts = {}
+      for _, p in ipairs(src) do pts[#pts + 1] = { mapID = p.mapID, x = p.x, y = p.y } end
+      t.area, t.questID, t.points = true, s.q, pts
+    end
   end
-  -- (Daniel 11.10.: standing still it flipped between the needle and "In the objective area") the same
-  -- quest's area target stays as it is: Questdon picks the nearest spot in it, a new table every 2 s
-  -- with Leveldon's own spot made it jump
-  local old = ns._arrowT
-  if t and t.area and old and old.area and old.questID == t.questID and old.label == t.label and #old.points == #t.points then return end
   -- (15.10.) the same place and text again (the turn-in asked every 2 s): nothing to change
   if t and old and not t.area and not old.area and old.mapID == t.mapID and old.x == t.x and old.y == t.y and old.label == t.label then return end
   ns._arrowT = t
@@ -2065,6 +2100,23 @@ local function AfterPrereqs(out)
 end
 ns.Yards = Yards -- (tests)
 ns.Within = function(a, b, r) return Within(a, b, r) end -- (0.1.7 Fit.lua)
+-- (23.10., player Dorandy 18.10.: "dying right after the quest giver in front of the cave brings you back in the start
+-- area, you have to run to 37.3 60.6 and die there, lead there first") a death on purpose counts only where the game
+-- sends you to this spirit healer: far from the planned place (m, x, y) and not yet on the healer's side of it, the
+-- step leads there first (text and compass), then says to die
+ns.DIE_SPOT_YARDS = 50
+function ns.DieWalkFirst(s)
+  if not (s and s.k == "die" and s.m and s.x and s.y and s.gm and s.gx and s.gy) then return false end
+  local m = Map()
+  local x, y = ns.PlayerXY()
+  if not (m and x and y) or m ~= s.m then return false end
+  local here, spot, healer = { m = m, x = x, y = y }, { m = s.m, x = s.x, y = s.y }, { m = s.gm, x = s.gx, y = s.gy }
+  local dSpot = Yards(here, spot)
+  if not dSpot or dSpot <= ns.DIE_SPOT_YARDS then return false end
+  local dHere, dPlace = Yards(here, healer), Yards(spot, healer)
+  if dHere and dPlace and dHere < dPlace then return false end
+  return true
+end
 ns.HubEnd = function(out, j) return HubEnd(out, j) end -- (0.1.7 Fit.lua)
 
 -- (0.1.6, Daniel 10.10.) the start area's book quest: with a gathering profession chosen, its turn-in says which
@@ -2492,6 +2544,29 @@ local function CanCamp() return SkillRank(185) ~= nil end
 -- quest chain from level 14): a stack of Well-Rested per minute lying in it, up to 3 (+1 % XP each, kills and
 -- quests), for 2 hours; the bag has a 1 hour cooldown and counts as a rest area (Rested XP). Reminder: when the
 -- bonus runs out (or you have none yet), the bag is ready, out of combat and not in a town; eat and drink meanwhile.
+-- (23.10., Daniel's /lvd mem: a window build about 58 KB) the player's buffs by name, read once after each change
+-- (UNIT_AURA, at the latest every 10 s): C_UnitAuras.GetBuffDataByIndex hands out a new table of some 25 fields per
+-- buff, and the window asked twice per build (sleeping bag, Well Fed), the recorder (eating) every second.
+-- ns.Auras.Find(name): the buff's expiration time (0 without one), nil when it is not on you
+ns.Auras = { by = {}, dirty = true, at = -100 }
+function ns.Auras.Find(name)
+  local A, now = ns.Auras, Now()
+  if A.dirty or now - A.at > 10 or now < A.at then
+    A.dirty, A.at = false, now
+    for k in pairs(A.by) do A.by[k] = nil end
+    for i = 1, 40 do
+      local n, expires = Buff("player", i)
+      if not n then break end
+      if Usable(n) and A.by[n] == nil then A.by[n] = (type(expires) == "number" and Usable(expires)) and expires or 0 end
+    end
+  end
+  return A.by[name]
+end
+do
+  local af = ns.CreateFrame("Frame")
+  if not (af.RegisterUnitEvent and pcall(af.RegisterUnitEvent, af, "UNIT_AURA", "player")) then pcall(af.RegisterEvent, af, "UNIT_AURA") end
+  af:SetScript("OnEvent", function(_, _, unit) if unit == nil or unit == "player" then ns.Auras.dirty = true end end)
+end
 ns.Bag = { item = 211527, lasts = 7200, at = 0 } -- at: GetTime() when you lay down last (0: not this session)
 function ns.Bag.Ready()
   if Count(ns.Bag.item) == 0 then return false end
@@ -2503,11 +2578,8 @@ function ns.Bag.Ready()
 end
 function ns.Bag.Left()
   ns.Bag.buff = ns.Bag.buff or "Well-Rested"
-  for i = 1, 40 do
-    local name, expires = Buff("player", i)
-    if not name then break end
-    if name == ns.Bag.buff then return expires and expires > 0 and (expires - Now()) or ns.Bag.lasts end
-  end
+  local expires = ns.Auras.Find(ns.Bag.buff)
+  if expires then return expires > 0 and (expires - Now()) or ns.Bag.lasts end
   if ns.Bag.at > 0 and Now() - ns.Bag.at < ns.Bag.lasts then return ns.Bag.lasts - (Now() - ns.Bag.at) end
   -- (15.10., review round 1) after a reload, in every language: the time you lay down, kept in the saved variables
   local at = db and tonumber(db.bagAt)
@@ -2515,8 +2587,9 @@ function ns.Bag.Left()
   return nil
 end
 ns.SleepingBagHint = function() -- (tests)
+  if not (db ~= nil and db.bag ~= false and ns.Bag.Ready()) then return false end -- (23.10.) the buffs only when it can matter
   local left = ns.Bag.Left()
-  return db ~= nil and db.bag ~= false and ns.Bag.Ready() and (not left or left < 600)
+  return (not left or left < 600)
     and not (UnitAffectingCombat and UnitAffectingCombat("player")) and not (IsResting and IsResting())
 end
 
@@ -2547,11 +2620,8 @@ end
 -- seconds left on Well Fed (nil: not fed)
 local function WellFedLeft()
   wellFedName = wellFedName or SpellName(19705) or L["Well Fed"]
-  for i = 1, 40 do
-    local name, expires = Buff("player", i)
-    if not name then break end
-    if name == wellFedName then return expires and expires > 0 and (expires - Now()) or 900 end
-  end
+  local expires = ns.Auras.Find(wellFedName)
+  if expires then return expires > 0 and (expires - Now()) or 900 end
   return nil
 end
 local wasFed = false
@@ -2735,8 +2805,13 @@ end
 end
 
 -- quest IDs in the log
+-- (23.10., /lvd mem) the list is kept until the log changes (QUEST_LOG_UPDATE and its kin, ns._logDirty) and at most
+-- 5 s: the game's C_QuestLog.GetInfo makes a new table of 21 fields for each line of the log, every 3 s for AlongHere
 local function LogQuests()
+  local now = GetTime and GetTime() or 0
+  if ns._logQ and not ns._logDirty and now - (ns._logQAt or -100) < 5 and now >= (ns._logQAt or 0) then return ns._logQ end
   local out = {}
+  ns._logQ, ns._logQAt, ns._logDirty = out, now, nil
   local n = (C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries())
     or (GetNumQuestLogEntries and GetNumQuestLogEntries()) or 0
   for i = 1, n do
@@ -3122,8 +3197,9 @@ function TravelTick()
   if not (a and a.DistanceTo) then return end
   local here = Map()
   for i, lk in ipairs(ROUTE.links or {}) do   -- (15.10., review round 1: "L" hid the texts, the line threw)
-    for side, e in ipairs({ lk.a, lk.b }) do
-      if e.m == here then
+    for side = 1, 2 do -- (23.10.) was ipairs({ lk.a, lk.b }): a table per link every 2 s
+      local e = side == 1 and lk.a or lk.b
+      if e and e.m == here then
         local d = a.DistanceTo(e.m, e.x / 100, e.y / 100)
         if type(d) == "number" and d < TRAVEL_R then
           if dock and dock.i == i and dock.side ~= side then
@@ -3178,7 +3254,7 @@ local function ExportText()
 end
 function ShowExport()
   if not exportFrame then
-    local f = CreateFrame("Frame", "LeveldonExport", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    local f = ns.CreateFrame("Frame", "LeveldonExport", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     f:SetSize(460, 300)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
@@ -3195,12 +3271,12 @@ function ShowExport()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", 8, -6)
     title:SetText(Style.Wordmark("Level", "don") .. L["  export: Ctrl+A, Ctrl+C"])
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    local close = ns.CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", 2, 2)
-    local sf = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
+    local sf = ns.CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
     sf:SetPoint("TOPLEFT", 8, -26)
     sf:SetPoint("BOTTOMRIGHT", -28, 8)
-    local eb = CreateFrame("EditBox", nil, sf)
+    local eb = ns.CreateFrame("EditBox", nil, sf)
     eb:SetMultiLine(true)
     eb:SetFontObject(ChatFontNormal or "ChatFontNormal")
     eb:SetWidth(420)
@@ -3332,7 +3408,7 @@ end
 do
 local profsBtnBar
 local function ProfsButton(parent, text, fill, textColor, fn)
-  local b = CreateFrame("Button", nil, parent)
+  local b = ns.CreateFrame("Button", nil, parent)
   local function Tex(layer, c, a)
     local t = b:CreateTexture(nil, layer)
     t:SetColorTexture(c[1], c[2], c[3], a or 1)
@@ -3369,7 +3445,7 @@ local function ProfsButton(parent, text, fill, textColor, fn)
 end
 ns.ProfsBar = function()
   if not profsBtnBar then
-    local f = CreateFrame("Frame", nil, UIParent)
+    local f = ns.CreateFrame("Frame", nil, UIParent)
     local none = ProfsButton(f, T.profsNone, BK.cardLow or { 0.11, 0.13, 0.28 }, BK.textSecondary or { 0.8, 0.76, 0.68 },
       function() ApplyProfs({}, true) end)
     local done = ProfsButton(f, T.profsDone, BK.card or { 0.17, 0.21, 0.40 }, BK.goldLight or { 0.97, 0.87, 0.60 },
@@ -3466,7 +3542,7 @@ local function CheckProfsAtStart()
   -- the skill lines may come a moment after login
   if GetNumSkillLines and (tonumber(GetNumSkillLines()) or 0) == 0 and profsStartTries < 3 then
     profsStartTries = profsStartTries + 1
-    C_Timer.After(3, CheckProfsAtStart)
+    ns.After(3, CheckProfsAtStart)
     return
   end
   local primaries, missing, set = 0, false, {}
@@ -3505,7 +3581,7 @@ local function OnFirstAccept()
   if not db or db.firstAccept then return end
   db.firstAccept = true
   if db.profs ~= nil or not RouteHasProfs() then return end
-  C_Timer.After(2, ShowProfsEarly)
+  ns.After(2, ShowProfsEarly)
 end
 
 ---------------------------------------------------------------------------
@@ -3584,7 +3660,7 @@ local function MakeLogButton()
     end
     return logButton
   end
-  local b = CreateFrame("Button", "LeveldonTrackerButton", host, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  local b = ns.CreateFrame("Button", "LeveldonTrackerButton", host, BackdropTemplateMixin and "BackdropTemplate" or nil)
   b:SetSize(150, 20)
   b:SetPoint("TOPRIGHT", host, "BOTTOMRIGHT", 0, -2)
   if b.SetBackdrop then
@@ -3699,7 +3775,7 @@ local function Refresh()
   end or nil)
   if Win then Win.Line(main, "now") pcall(Win.Now, main) end
   local m, x, y = Place(cur)
-  if s and s.k == "die" and s.gm and s.gx then m, x, y = s.gm, s.gx, s.gy end -- (12.10.) the spirit healer
+  if s and s.k == "die" and s.gm and s.gx and not ns.DieWalkFirst(s) then m, x, y = s.gm, s.gx, s.gy end -- (12.10.) the spirit healer
   -- (0.1.4) a do step: the place the arrow points at (the nearest open one), not the planned one
   if s and kind == "do" and InLog(s.q) then
     local p = NearestObjective(s.q)
@@ -3970,7 +4046,7 @@ function Update(initial)
   Advance(behind)
   if ns._replan and C_Timer then
     ns._replan = nil
-    C_Timer.After(0, function() if ns.LeveldonRecompose then pcall(ns.LeveldonRecompose) end end)
+    ns.After(0, function() if ns.LeveldonRecompose then pcall(ns.LeveldonRecompose) end end)
   end
   if not initial and not (ns._held and ns._held.s == STEPS[cur]) then   -- (13.10.) a held step: no jumps either
     -- (17.10.) while a timed quest's clock runs no class quest goes in front of it either (Fit.lua ns.TimedRunning)
@@ -4144,7 +4220,7 @@ function ns.SM.Action(what)
   if ns.SM.menu then ns.SM.menu:Hide() end
 end
 function ns.SM.Row(parent)
-  local r = CreateFrame("Button", nil, parent)
+  local r = ns.CreateFrame("Button", nil, parent)
   r:SetHeight(22)
   r.hover = r:CreateTexture(nil, "BACKGROUND")
   r.hover:SetAllPoints(r)
@@ -4163,12 +4239,12 @@ function ns.SM.Show()
   if not s then return end
   local m = ns.SM.menu
   if not m then
-    local c = CreateFrame("Button", nil, UIParent)
+    local c = ns.CreateFrame("Button", nil, UIParent)
     c:SetAllPoints(UIParent)
     c:SetFrameStrata("DIALOG")
     if c.RegisterForClicks then c:RegisterForClicks("AnyUp") end
     c:SetScript("OnClick", function() if ns.SM.menu then ns.SM.menu:Hide() end end)
-    m = CreateFrame("Frame", "LeveldonStepMenu", UIParent)
+    m = ns.CreateFrame("Frame", "LeveldonStepMenu", UIParent)
     m.catcher = c
     m:SetFrameStrata("DIALOG")
     local lvl = c.GetFrameLevel and tonumber(c:GetFrameLevel())
@@ -4245,23 +4321,45 @@ local function Build()
   if Get("shown") ~= false then panel:FadeIn() end
 end
 
+-- (23.10., Daniel's /lvd mem: the three tickers of PLAYER_LOGIN 62 KB a second together) their parts by name: called
+-- from a ticker they show as "(inner)", from an event at the top. Outside /lvd mem each wrapper checks one variable.
+if ns.Track then
+  Refresh = ns.Track("window build", Refresh)
+  ns.LF.TickRefresh = ns.Track("window tick", ns.LF.TickRefresh)
+  AlongHere = ns.Track("along here", AlongHere)
+  NearestObjective = ns.Track("nearest objective", NearestObjective)
+  Arrow = ns.Track("arrow", Arrow)
+  MarkTick = ns.Track("mark tick", MarkTick)
+  TravelTick = ns.Track("travel tick", TravelTick)
+  ApplyTracker = ns.Track("tracker hide", ApplyTracker)
+  -- (23.10., second /lvd mem: "window build" about 58 KB each in the game, 3.6 KB in the bench) the build's parts
+  Hints = ns.Track("hints", Hints)
+  StepText = ns.Track("step text", StepText)
+  Kind = ns.Track("kind", Kind)
+  StepDone = ns.Track("step done", StepDone)
+  ns.LvdObjList = ns.Track("objective list", ns.LvdObjList)
+end
+
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
-local f = CreateFrame("Frame")
+local f = ns.CreateFrame("Frame")
 local pending = false
 local function Soon()
   if pending then return end
   pending = true
-  C_Timer.After(0.3, function() pending = false Update(false) end)
+  ns.After(0.3, function() pending = false Update(false) end)
 end
 
 f:SetScript("OnEvent", function(_, event, ...)
+  if event == "QUEST_LOG_UPDATE" or event == "QUEST_ACCEPTED" or event == "QUEST_TURNED_IN" or event == "UNIT_QUEST_LOG_CHANGED" then
+    ns._logDirty = true -- (23.10.) LogQuests builds its list again
+  end
   -- (15.10., review round 3) Questdon's "cannot take" can change: a quest handed in, a skill learned, a level
   if event == "QUEST_TURNED_IN" or event == "SKILL_LINES_CHANGED" or event == "PLAYER_LEVEL_UP" then
     for k in pairs(blocked) do blocked[k] = nil end
   end
-  if (event == "PLAYER_LEVEL_UP" or event == "QUEST_TURNED_IN") and C_Timer then C_Timer.After(1, function() pcall(ns.ReturnLeftOut) end) end
+  if (event == "PLAYER_LEVEL_UP" or event == "QUEST_TURNED_IN") and C_Timer then ns.After(1, function() pcall(ns.ReturnLeftOut) end) end
   if event == "ADDON_LOADED" then
     -- (0.1.6) the quest log of the map (or the classic one) may come with a Blizzard addon later
     if ... ~= addonName then if db then pcall(MakeLogButton) end return end
@@ -4310,20 +4408,20 @@ f:SetScript("OnEvent", function(_, event, ...)
       for j, t in ipairs(STEPS) do if t.k == remap.k and t.q == remap.q then cur = j break end end
       ns.SaveStep()
     end
-    C_Timer.After(2, function() Update(true) end) -- quest log and Questdon are ready by then
+    ns.After(2, function() Update(true) end) -- quest log and Questdon are ready by then
     sessionStart = Now()
-    C_Timer.After(6, BagCheck)
-    C_Timer.After(4, function() pcall(CheckLogChains) end)
-    C_Timer.NewTicker(1, function() if panel and panel:IsShown() then pcall(ns.LF.TickRefresh) end pcall(MarkTick) end)
+    ns.After(6, BagCheck)
+    ns.After(4, function() pcall(CheckLogChains) end)
+    ns.NewTicker(1, function() if panel and panel:IsShown() then pcall(ns.LF.TickRefresh) end pcall(MarkTick) end)
     -- (0.1.6) Blizzard's quest tracker: hidden again when the game shows it again (one alpha read)
     pcall(ApplyTracker)
     pcall(MakeLogButton)
-    C_Timer.After(3, function() pcall(CheckProfsAtStart) end) -- (0.1.6) professions missing: the choice now
-    C_Timer.NewTicker(0.5, function()
+    ns.After(3, function() pcall(CheckProfsAtStart) end) -- (0.1.6) professions missing: the choice now
+    ns.NewTicker(0.5, function()
       if (db.hideTracker ~= false or trackerHidden) and not InCombat() then pcall(ApplyTracker) end
       if not logButton or logButton._rank > 1 then pcall(MakeLogButton) end
     end)
-    C_Timer.NewTicker(2, function()
+    ns.NewTicker(2, function()
       pcall(TravelTick)
       if STEPS[cur] and Kind(STEPS[cur]) == "do" then pcall(MarkUsed, STEPS[cur].q) pcall(Arrow) end
       -- (15.10., Zip at Mirror Lake: "arrow still pointing to Mirror Lake") a turn-in's place asked again: right
@@ -4412,7 +4510,7 @@ f:SetScript("OnEvent", function(_, event, ...)
   elseif event == "PLAYER_REGEN_ENABLED" then
     -- (0.1.6) what waited for the end of the fight
     if trackerPending then pcall(ApplyTracker) end
-    if profsEarlyWaiting then C_Timer.After(1, ShowProfsEarly) end
+    if profsEarlyWaiting then ns.After(1, ShowProfsEarly) end
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
     local unit, _, spellID = ...
     local sname = SpellName(spellID)
@@ -4489,6 +4587,7 @@ SLASH_LEVELDON2 = "/leveldon"
 SlashCmdList.LEVELDON = function(msg)
   msg = (msg or ""):lower():match("^%s*(.-)%s*$")
   if msg == "next" then Skip(1)
+  elseif msg == "mem" or msg:match("^mem %d+$") then if ns.MemCheck then ns.MemCheck(msg:match("^mem (%d+)$")) end -- (23.10.) memory by part
   elseif msg == "options" or msg == "config" then if ns.OpenOptions then ns.OpenOptions() end
   elseif msg == "report" then if ns.OpenReport then ns.OpenReport() end
   elseif msg == "text" or msg:match("^text ") then if ns.TextCommand then ns.TextCommand(msg:match("^text%s*(.*)$")) end

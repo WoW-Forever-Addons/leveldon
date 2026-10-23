@@ -2,7 +2,7 @@
 ## Title: |cff3fa9f5Level|rdon Routes: Tauren
 ## Notes: Leveldon's routes for Tauren, loaded only when you play this race.
 ## Author: DonCoohd
-## Version: 0.2.4-beta
+## Version: 0.2.5-beta
 ## Dependencies: Leveldon
 ## LoadOnDemand: 1
 

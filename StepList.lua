@@ -252,7 +252,7 @@ local function Tex(parent, layer)
 end
 
 local function NewRow(f, i)
-  local r = CreateFrame("Button", nil, f)
+  local r = ns.CreateFrame("Button", nil, f)
   r.owner = f
   r:SetHeight(ROW)
   if r.RegisterForClicks then r:RegisterForClicks("AnyUp") end
@@ -291,7 +291,7 @@ end
 local function ListFrame()
   local f = SL.f
   if f then return f end
-  f = CreateFrame("Frame", nil, UIParent)
+  f = ns.CreateFrame("Frame", nil, UIParent)
   f:SetSize(300, ROW * 3 + PAD * 2)
   f.owner = f
   f.rows = {}
@@ -308,7 +308,7 @@ local function ListFrame()
   if f.EnableMouseWheel then f:EnableMouseWheel(true) end
   f:SetScript("OnMouseWheel", OnWheel)
   -- the slider: a track and a thumb to drag
-  f.track = CreateFrame("Button", nil, f)
+  f.track = ns.CreateFrame("Button", nil, f)
   f.track.owner = f
   f.track:SetWidth(BAR_W)
   f.track:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -PAD)
@@ -318,7 +318,7 @@ local function ListFrame()
   f.track.bg = Tex(f.track, "BACKGROUND")
   f.track.bg:SetVertexColor(1, 1, 1, 0.10)
   f.track.bg:SetAllPoints()
-  f.thumb = CreateFrame("Button", nil, f)
+  f.thumb = ns.CreateFrame("Button", nil, f)
   f.thumb.owner = f
   f.thumb:SetWidth(BAR_W)
   if f.thumb.SetFrameLevel and f.GetFrameLevel then f.thumb:SetFrameLevel((tonumber(f:GetFrameLevel()) or 1) + 3) end
@@ -476,4 +476,11 @@ function SL.Build(panel, ctx, width)
   SL.AreaRows(panel, ctx)
   SL.Block(panel, ctx, width)
   return true
+end
+
+-- (23.10., /lvd mem) the list's parts by name (inner within "window build")
+if ns.Track then
+  SL.Collect = ns.Track("list collect", SL.Collect)
+  SL.AreaRows = ns.Track("list area rows", SL.AreaRows)
+  SL.Block = ns.Track("list block", SL.Block)
 end

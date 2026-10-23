@@ -92,7 +92,7 @@ W.Clock, W.Delta = Clock, Delta -- (tests)
 -- (12.10., Daniel: "I have only played 32 min") it stops after IDLE seconds without doing anything (standing,
 -- chatting, away) and goes on with the next move, fight, cast, loot or talk to an NPC
 local IDLE = 120
-local ticker = CreateFrame("Frame")
+local ticker = ns.CreateFrame("Frame")
 local acc, lastActive = 0, nil
 function W.Active() lastActive = GetTime and GetTime() or 0 end
 -- (13.10., Daniel's error "Window.lua:101: attempt to perform numeric conversion on a secret number value") in
@@ -153,14 +153,14 @@ function W.LevelUp(level)
     while #r.splits > 12 do table.remove(r.splits, 1) end
   end
 end
-local ev = CreateFrame("Frame")
+local ev = ns.CreateFrame("Frame")
 ev:SetScript("OnEvent", function(_, _, level) pcall(W.LevelUp, tonumber(level)) end)
 pcall(ev.RegisterEvent, ev, "PLAYER_LEVEL_UP")
 
 local runFrame
 local function RunFrame()
   if runFrame then return runFrame end
-  local f = CreateFrame("Frame", nil, UIParent)
+  local f = ns.CreateFrame("Frame", nil, UIParent)
   f:SetSize(300, 26)
   f.bg = Tex(f, "BACKGROUND", { 0.05, 0.06, 0.14 }, 0.55)
   f.bg:SetAllPoints()
@@ -238,7 +238,7 @@ end
 local banner
 local function BannerFrame()
   if banner then return banner end
-  local f = CreateFrame("Frame", nil, UIParent)
+  local f = ns.CreateFrame("Frame", nil, UIParent)
   f:SetSize(300, 46)
   f.bg = Tex(f, "BACKGROUND", { 0.20, 0.15, 0.35 }, 0.35)
   f.bg:SetAllPoints()
@@ -347,7 +347,7 @@ end
 local station
 local function StationFrame()
   if station then return station end
-  local f = CreateFrame("Frame", nil, UIParent)
+  local f = ns.CreateFrame("Frame", nil, UIParent)
   f:SetSize(300, COMPASS + 20)
   f.bg = Tex(f, "BACKGROUND", { 0.35, 0.66, 0.94 }, 0.07)
   f.bg:SetAllPoints()
@@ -584,6 +584,14 @@ function W.Finish(panel)
 end
 
 -- Shift + mouse wheel over the title bar: the background's opacity (down to nothing, frame included)
+-- (23.10., /lvd mem) the window's parts by name (inner within "window build")
+if ns.Track then
+  W.Run = ns.Track("win run", W.Run)
+  W.Banner = ns.Track("win banner", W.Banner)
+  W.Station = ns.Track("win station", W.Station)
+  W.Finish = ns.Track("win finish", W.Finish)
+end
+
 function W.WheelAlpha(panel, delta)
   if not (IsShiftKeyDown and IsShiftKeyDown()) or not panel then return false end
   local a = panel._bgAlpha or Style.DEFAULT_ALPHA

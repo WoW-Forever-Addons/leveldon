@@ -68,6 +68,12 @@ local function On() return LeveldonDB and LeveldonDB.recOff ~= true end
 local function Pos()
   local m = C_Map and Call(C_Map.GetBestMapForUnit, "player")
   if not Num(m) then return nil end
+  -- (23.10., /lvd mem) Questdon's position (UnitPosition) first: the map's answer is a new vector table each second
+  local api = rawget(_G, "QuestdonAPI")
+  if api and api.PlayerPosition then
+    local qm, qx, qy = Call(api.PlayerPosition)
+    if qm == m and Num(qx) and Num(qy) and not (qx == 0 and qy == 0) then return m, qx * 100, qy * 100 end
+  end
   local p = Call(C_Map.GetPlayerMapPosition, m, "player")
   if not (p and p.GetXY) then return nil end
   local ok, x, y = pcall(p.GetXY, p)
@@ -327,16 +333,16 @@ local function Talked()
   if id > 0 and not talked[id] then talked[id] = true Ev("N", id, PosText()) end
 end
 local turnedAt = {}
-local f = CreateFrame("Frame")
+local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, e, ...)
   if e == "PLAYER_LOGIN" then
     Start()
     lastXP, lastMax, lastLevel = Num(Call(UnitXP, "player")), Num(Call(UnitXPMax, "player")), Level()
     if C_Timer and C_Timer.NewTicker then
-      C_Timer.NewTicker(SAMPLE, function() pcall(Walk) end)
-      C_Timer.NewTicker(BUCKET, function() pcall(Flush) end)
-      C_Timer.NewTicker(1, function() pcall(StepWatch) end)
-      C_Timer.NewTicker(0.5, function() pcall(InsideWatch) end)
+      ns.NewTicker(SAMPLE, function() pcall(Walk) end)
+      ns.NewTicker(BUCKET, function() pcall(Flush) end)
+      ns.NewTicker(1, function() pcall(StepWatch) end)
+      ns.NewTicker(0.5, function() pcall(InsideWatch) end)
     end
     return
   end
@@ -365,7 +371,7 @@ f:SetScript("OnEvent", function(_, e, ...)
       -- turned in a moment later (the events come in either order)
       local at = Now()
       if C_Timer and C_Timer.After then
-        C_Timer.After(2, function() if not (turnedAt[q] and turnedAt[q] >= at - 5) then Ev("X", q) end end)
+        ns.After(2, function() if not (turnedAt[q] and turnedAt[q] >= at - 5) then Ev("X", q) end end)
       else
         Ev("X", q)
       end
@@ -458,6 +464,10 @@ local function Eating()
   local get = (C_Spell and C_Spell.GetSpellName) or GetSpellInfo
   foodName = foodName or Call(get, 433)
   drinkName = drinkName or Call(get, 430)
+  -- (23.10., /lvd mem) the buffs read once per change (Leveldon.lua ns.Auras), not a new aura table per buff a second
+  if ns.Auras and ns.Auras.Find then
+    return (foodName ~= nil and ns.Auras.Find(foodName) ~= nil) or (drinkName ~= nil and ns.Auras.Find(drinkName) ~= nil)
+  end
   for i = 1, 40 do
     local name
     if C_UnitAuras and C_UnitAuras.GetBuffDataByIndex then
@@ -534,17 +544,17 @@ end
 ns.RecWatch = Watch -- (tests)
 ns.RecPause = function() return more.pause end -- (tests)
 
-local f2 = CreateFrame("Frame")
+local f2 = ns.CreateFrame("Frame")
 local objPending = false
 f2:SetScript("OnEvent", function(_, e)
   if e == "PLAYER_LOGIN" then
-    if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(1, function() pcall(Watch) end) end
-    if C_Timer and C_Timer.After then C_Timer.After(3, function() pcall(ObjectiveWatch) end) end
+    if C_Timer and C_Timer.NewTicker then ns.NewTicker(1, function() pcall(Watch) end) end
+    if C_Timer and C_Timer.After then ns.After(3, function() pcall(ObjectiveWatch) end) end
   elseif e == "QUEST_LOG_UPDATE" or e == "UNIT_QUEST_LOG_CHANGED" then
     if objPending then return end
     objPending = true
     if C_Timer and C_Timer.After then
-      C_Timer.After(0.5, function() objPending = false pcall(ObjectiveWatch) end)
+      ns.After(0.5, function() objPending = false pcall(ObjectiveWatch) end)
     else
       objPending = false pcall(ObjectiveWatch)
     end

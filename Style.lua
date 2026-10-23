@@ -873,7 +873,15 @@ local function RowLayout(row, width)
 end
 
 local function HeaderLayout(hdr, width)
-  hdr.text:SetWidth(width)
+  -- (18.10.) a foldable header keeps room on the right for "+"/"-" and its count
+  local vw = 0
+  if hdr.value and hdr._onFold then
+    hdr.value:ClearAllPoints()
+    hdr.value:SetPoint("TOPRIGHT", hdr, "TOPRIGHT", 0, 0)
+    vw = 48
+    hdr.value:SetWidth(vw)
+  end
+  hdr.text:SetWidth(max(width - vw, 1))
   hdr.text:ClearAllPoints()
   hdr.text:SetPoint("TOPLEFT", hdr, "TOPLEFT", 0, 0)
   local h, ok = TextHeight(hdr.text)
@@ -1318,10 +1326,28 @@ function Style.Header(panel, text)
       return self
     end
     function hdr:Release() Release(self) end
+    -- (18.10.) SetFold(open, count, fn): a click on the header calls fn(header, button); the right shows "-" while
+    -- open, "+ count" while folded. Every Header() call starts unfoldable again.
+    hdr.value = NewFont(hdr, "GameFontNormalLarge", "textPrimary") -- (18.10., Daniel: the "-" was hard to see) bigger and brighter; (20.10.) larger still
+    if hdr.value.SetJustifyH then hdr.value:SetJustifyH("RIGHT") end
+    hdr:SetScript("OnMouseUp", function(self, button) if self._onFold then Try("header.fold", self._onFold, self, button) end end)
+    function hdr:SetFold(open, count, fn)
+      self._onFold = type(fn) == "function" and fn or nil
+      local t = self._onFold and (open and "\226\128\148" or ("+ " .. tostring(count or ""))) or ""
+      -- (20.10.) the long dash is large, the count next to a folded header normal
+      if self.value.SetFontObject then self.value:SetFontObject(open and "GameFontNormalLarge" or "GameFontNormal") end
+      if (self.value:GetText() or "") ~= t then self.value:SetText(t); Changed(self) end
+      self.value:SetShown(self._onFold ~= nil)
+      if self.EnableMouse then self:EnableMouse(self._onFold ~= nil) end
+      return self
+    end
   end
   hdr._gapBefore, hdr._keep = nil, nil
+  if hdr._onFold then hdr:SetFold(nil, nil, nil) end
   local c = panel._look == "book" and BOOK.gold or COLORS.textSecondary
   hdr.text:SetTextColor(c[1], c[2], c[3], 1)
+  local vc = panel._look == "book" and BOOK.goldLight or COLORS.textPrimary
+  hdr.value:SetTextColor(vc[1], vc[2], vc[3], 1)
   hdr:SetText(text)
   Style.RequestRelayout(panel)
   return hdr

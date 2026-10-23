@@ -83,7 +83,7 @@ local function Attach()
   local st = Store()
   if st.scale == nil then SetText(DEFAULT_SCALE) end
   Apply(st.w or DEFAULT_W, st.lines or DEFAULT_LINES, false)
-  grip = CreateFrame("Button", "LeveldonResizeGrip", p)
+  grip = ns.CreateFrame("Button", "LeveldonResizeGrip", p)
   grip:SetSize(16, 16)
   grip:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -3, 3)
   if grip.SetFrameLevel and p.GetFrameLevel then grip:SetFrameLevel((p:GetFrameLevel() or 60) + 30) end
@@ -130,8 +130,8 @@ local function Attach()
 end
 ns.LeveldonAttachResize = Attach -- (tests)
 
-local f = CreateFrame("Frame")
-f:SetScript("OnEvent", function() if C_Timer and C_Timer.After then C_Timer.After(0, Attach) else Attach() end end)
+local f = ns.CreateFrame("Frame")
+f:SetScript("OnEvent", function() if C_Timer and C_Timer.After then ns.After(0, Attach) else Attach() end end)
 f:RegisterEvent("PLAYER_LOGIN")
 
 -- /lvd text <size>, /lvd text reset

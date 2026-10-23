@@ -202,12 +202,12 @@ function ns.ShareCommand(arg)
     On() and L["on"] or L["off"], S.stats.sent, S.stats.got, n))
 end
 
-local f = CreateFrame("Frame")
+local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, e, ...)
   if e == "CHAT_MSG_ADDON" then pcall(S.OnMessage, ...)
   elseif e == "PLAYER_LOGIN" then
     Register()
-    if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(5, function() pcall(S.Flush) end) end
+    if C_Timer and C_Timer.NewTicker then ns.NewTicker(5, function() pcall(S.Flush) end) end
   end
 end)
 for _, e in ipairs({ "CHAT_MSG_ADDON", "PLAYER_LOGIN" }) do pcall(f.RegisterEvent, f, e) end

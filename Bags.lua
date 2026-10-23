@@ -136,7 +136,7 @@ end
 local function Overlay(btn)
   local o = btn._lvdKeep
   if o then return o end
-  o = CreateFrame("Frame", nil, btn)
+  o = ns.CreateFrame("Frame", nil, btn)
   o.btn = btn
   o:SetAllPoints(btn)
   if o.SetFrameLevel and btn.GetFrameLevel then o:SetFrameLevel((tonumber(btn:GetFrameLevel()) or 1) + 4) end
@@ -259,13 +259,13 @@ end
 function BG.Soon()
   if S.pending then return end
   S.pending = true
-  if C_Timer and C_Timer.After then C_Timer.After(0.2, BG.Later) else BG.Later() end
+  if C_Timer and C_Timer.After then ns.After(0.2, BG.Later) else BG.Later() end
 end
 
 ---------------------------------------------------------------------------
 -- Events and the light look at the windows
 ---------------------------------------------------------------------------
-local ef = CreateFrame("Frame")
+local ef = ns.CreateFrame("Frame")
 local elapsed = 0
 ef:SetScript("OnUpdate", function(_, dt)
   elapsed = elapsed + (tonumber(dt) or 0)

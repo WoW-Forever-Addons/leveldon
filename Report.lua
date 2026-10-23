@@ -48,7 +48,7 @@ local function Context(c)
 end
 
 local function Button(parent, text, w, onClick)
-  local b = CreateFrame("Button", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  local b = ns.CreateFrame("Button", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
   b:SetSize(w, 22)
   if b.SetBackdrop then
     pcall(b.SetBackdrop, b, { bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
@@ -108,7 +108,7 @@ local function Pick(key)
 end
 
 local function Create()
-  local f = CreateFrame("Frame", "LeveldonReport", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  local f = ns.CreateFrame("Frame", "LeveldonReport", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
   f:SetSize(400, 250)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
   f:SetFrameStrata("DIALOG")
@@ -127,7 +127,7 @@ local function Create()
   f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   f.title:SetPoint("TOPLEFT", 12, -10)
   f.title:SetText(Style.Wordmark("Level", "don") .. L["  report"])
-  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  local close = ns.CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", 2, 2)
   f.what = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   f.what:SetPoint("TOPLEFT", 12, -32)
@@ -143,7 +143,7 @@ local function Create()
     f.reasons[#f.reasons + 1] = b
     prev = b
   end
-  local box = CreateFrame("Frame", nil, f, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  local box = ns.CreateFrame("Frame", nil, f, BackdropTemplateMixin and "BackdropTemplate" or nil)
   box:SetPoint("TOPLEFT", 12, -98)
   box:SetPoint("BOTTOMRIGHT", -12, 42)
   if box.SetBackdrop then
@@ -151,7 +151,7 @@ local function Create()
     pcall(box.SetBackdropColor, box, 0, 0, 0, 0.35)
     pcall(box.SetBackdropBorderColor, box, 1, 1, 1, 0.12)
   end
-  local eb = CreateFrame("EditBox", nil, box)
+  local eb = ns.CreateFrame("EditBox", nil, box)
   eb:SetMultiLine(true)
   eb:SetMaxLetters(400)
   eb:SetFontObject(ChatFontNormal or "ChatFontNormal")

@@ -9,6 +9,12 @@ local _, ns = ...
 ns.LOCALE = (GetLocale and GetLocale()) or "enUS"
 
 local deDE = {
+  -- (23.10.) /lvd mem
+  ["The game does not tell the memory of addons here."] = "Das Spiel nennt hier den Speicher der Addons nicht.",
+  ["Measuring Leveldon's memory for %d seconds (stay out of fights)..."] = "Messe Leveldons Speicher %d Sekunden lang (bitte nicht kämpfen)...",
+  ["%s: %.1f MB, about %d KB new memory a second"] = "%s: %.1f MB, etwa %d KB neuer Speicher je Sekunde",
+  ["Leveldon's new memory by part:"] = "Leveldons neuer Speicher nach Teilen:",
+  ["No part of Leveldon made 1 KB a second or more."] = "Kein Teil von Leveldon kam auf 1 KB je Sekunde oder mehr.",
   -- step verbs
   ["Accept"] = "Annehmen",
   ["Do"] = "Erledigen",
@@ -46,6 +52,7 @@ local deDE = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples ergeben einen Thunder Applejack: aufheben für Sergeant De Vries in der Westbrook-Garnison, im Gebäude links; er startet An Apple Treat)",
   ["Grind to level %d (about %d mobs)"] = "Gegner töten bis Stufe %d (etwa %d Gegner)",
   ["Shortcut: let yourself die where you are now. You come back at the spirit healer by %s, where the route goes on (no resurrection sickness below level 10)"] = "Abkürzung: Lass dich dort sterben, wo du gerade bist. Du kommst beim Geistheiler bei %s zurück, wo die Route weitergeht (unter Stufe 10 keine Wiederbelebungsnachwirkungen).",
+  ["Shortcut: walk to the marked place, then let yourself die there. You come back at the spirit healer by %s, where the route goes on (no resurrection sickness below level 10)"] = "Abkürzung: Geh zum markierten Ort und lass dich dort sterben. Du kommst beim Geistheiler bei %s zurück, wo die Route weitergeht (unter Stufe 10 keine Wiederbelebungsnachwirkungen).",
   ["Learn your new skills at the trainer: %s (level %s)"] = "Neue Fähigkeiten beim Lehrer lernen: %s (Stufe %s)",
   ["Run %s with a group (%d quests, about %d min)"] = "%s mit einer Gruppe laufen (%d Quests, etwa %d Min.)",
   ["Run %s with a group (%d quests)"] = "%s mit einer Gruppe laufen (%d Quests)",

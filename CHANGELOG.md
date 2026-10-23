@@ -2,7 +2,17 @@
 
 ## 0.2.5 Beta
 
-- **Open data only:** the trainer spells per level and their prices, the shop prices and the group quests now come from open sources (What's Training, ForeverDB, the open Classic database CMaNGOS, All The Things) and from what players record. A few spells without a name in these sources show the game's own name.
+- **Choose your route:** after your start area, level through any other start area of your side (Options > Route or `/lvd line`), with the hours, quests and reputation of each choice. You can switch in the middle of the route.
+- **Routes rebuilt:** one route per race with your class's quests and trainers laid in where they cost the least walking, shorter ways between the steps, the corrections from playtests kept. Quests you take and drop again on the way are handed in where it pays, Rest and Relaxation comes at the end of Northshire.
+- **Step list:** scrolls with the mouse wheel and a slider; on top the current step and what you can do right here, below the steps to come. The header is tidier (step n of m in the chapter).
+- **Bags:** items a later quest needs get a frame in your bags, so you do not sell them.
+- **Selling:** a fixed stop at the vendor when you are at a hub anyway, at one who repairs when one is near; vendors only close to your way. At an inn the hearthstone comes first.
+- **Dying on purpose:** when you are not yet at the place where a death brings you to the right spirit healer, Leveldon leads you there first, then says to die.
+- **Skipped a profession's training?** Its buys, skill-ups and Camping 101 steps go by as well.
+- **Trainer spells by name:** talent ranks and Forever's new spells (Mind Flay 2 to 6, Penance, ...) are named and weighed like the others.
+- **Open data only:** trainer spells, prices, shops, group quests and the routes come from open sources (What's Training, ForeverDB, CMaNGOS, All The Things) and from what players record.
+- **Player reports worked in:** Call of Earth for orc and troll shamans at Spirit Rock in Durotar (not Mulgore), the shaman quest done together with the Burning Blade cave, a death in the cave back to the Valley of Trials, Tundra MacGrann's Stolen Stash only from level 10, no hearthstone on Zephras Isle before you bind it.
+- **Lighter:** fewer new tables while you play; `/lvd mem` shows Leveldon's memory by part.
 
 ## 0.2.4 Beta
 

@@ -138,7 +138,7 @@ local frames, free = {}, {} -- [unit] = frame
 local function Take()
   local f = table.remove(free)
   if f then return f end
-  f = CreateFrame("Frame", nil, UIParent)
+  f = ns.CreateFrame("Frame", nil, UIParent)
   f:SetSize(SIZE, SIZE)
   f.glow = f:CreateTexture(nil, "ARTWORK")
   f.glow:SetPoint("CENTER")
@@ -284,14 +284,14 @@ end
 M.Claim = Claim
 Claim()
 
-local f = CreateFrame("Frame")
+local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, event, unit)
   if event == "NAME_PLATE_UNIT_ADDED" then pcall(M.Check, unit)
   elseif event == "NAME_PLATE_UNIT_REMOVED" then Release(unit)
   elseif event == "PLAYER_ENTERING_WORLD" then Claim() pcall(Hint) end
 end)
 for _, e in ipairs({ "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "PLAYER_ENTERING_WORLD" }) do pcall(f.RegisterEvent, f, e) end
-if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(1, function() pcall(M.Scan) end) end
+if C_Timer and C_Timer.NewTicker then ns.NewTicker(1, function() pcall(M.Scan) end) end
 
 function M.Command()
   local db = DB()
