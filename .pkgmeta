@@ -1,0 +1,39 @@
+package-as: Leveldon
+
+# the route of each race is an addon of its own next to Leveldon
+move-folders:
+  Leveldon/Leveldon_Dwarf: Leveldon_Dwarf
+  Leveldon/Leveldon_DwarfLines: Leveldon_DwarfLines
+  Leveldon/Leveldon_Gnome: Leveldon_Gnome
+  Leveldon/Leveldon_GnomeLines: Leveldon_GnomeLines
+  Leveldon/Leveldon_Human: Leveldon_Human
+  Leveldon/Leveldon_HumanLines: Leveldon_HumanLines
+  Leveldon/Leveldon_NightElf: Leveldon_NightElf
+  Leveldon/Leveldon_NightElfLines: Leveldon_NightElfLines
+  Leveldon/Leveldon_Orc: Leveldon_Orc
+  Leveldon/Leveldon_OrcLines: Leveldon_OrcLines
+  Leveldon/Leveldon_Skyborne: Leveldon_Skyborne
+  Leveldon/Leveldon_SkyborneH: Leveldon_SkyborneH
+  Leveldon/Leveldon_SkyborneHLines: Leveldon_SkyborneHLines
+  Leveldon/Leveldon_SkyborneLines: Leveldon_SkyborneLines
+  Leveldon/Leveldon_Tauren: Leveldon_Tauren
+  Leveldon/Leveldon_TaurenLines: Leveldon_TaurenLines
+  Leveldon/Leveldon_Troll: Leveldon_Troll
+  Leveldon/Leveldon_TrollLines: Leveldon_TrollLines
+  Leveldon/Leveldon_Undead: Leveldon_Undead
+  Leveldon/Leveldon_UndeadLines: Leveldon_UndeadLines
+
+required-dependencies:
+  - questdon
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - .github
+  - .gitignore
+  - .pkgmeta
+  - CHANGELOG.md
+
+enable-nolib-creation: no
