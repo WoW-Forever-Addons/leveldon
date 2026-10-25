@@ -309,7 +309,14 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.4"
+local VERSION = "0.2.6"
+do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
+  local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+  local ok, v = false, nil
+  if get then ok, v = pcall(get, "Leveldon", "Version") end
+  v = ok and type(v) == "string" and v:match("^(%d+[%d%.]*)") or nil
+  if v then VERSION = v end
+end
 ns.LeveldonVersion = VERSION
 
 -- (0.1.6, Daniel 10.10.) the texts of this version in one place (for the translations later)
@@ -766,7 +773,20 @@ local function StepDone(i)
     return true
   end
   if s.k == "learn" then return SkillRank(s.sk) ~= nil end
-  if s.k == "use" then return SkillRank(s.sk) ~= nil end
+  if s.k == "use" then
+    if SkillRank(s.sk) ~= nil then return true end
+    -- (24.10., Daniel's Skyborne warrior: "he no longer sees that I learned Mining", LeveldonCharDB without ranks) the
+    -- book you had in your bags and no longer have counts as used, for every gathering book of every route
+    if s.i and LeveldonCharDB then
+      local seen = LeveldonCharDB.bookSeen
+      if ItemCount(s.i) > 0 then
+        if not (seen and seen[s.i]) then seen = seen or {} seen[s.i] = true LeveldonCharDB.bookSeen = seen end
+      elseif seen and seen[s.i] then
+        return true
+      end
+    end
+    return false
+  end
   if s.k == "farm" then return ItemCount(s.i) > 0 or InLog(s.q) or QuestDone(s.q) end
   -- (11.10.) a vendor stop put in when the bags were full or the money short (Fit.lua ns.CheckSell)
   if s.k == "sell" then
@@ -1087,6 +1107,26 @@ local BUY_HINT = {
 local LURES = { [6529] = true }
 
 
+-- (24.10., reviewer c) a breadcrumb leads to the next zone only when its quest starts there: when every quest it leads
+-- to starts in the zone of the step, the hint names the quest. Without data on where it leads: the old text.
+function ns.BreadcrumbHint(s)
+  local old = L["  (take it along: it leads to the next zone)"]
+  local a = QuestdonAPI
+  local targets = a and a.BreadcrumbTargets and a.BreadcrumbTargets(s.q)
+  if type(targets) ~= "table" or not s.m then return old end
+  local same, other
+  for _, t in ipairs(targets) do
+    local m = a.QuestStart and a.QuestStart(t)
+    if m then
+      if m == s.m then same = same or t else other = true end
+    end
+  end
+  if other or not same then return old end
+  local name = a.QuestTitle and a.QuestTitle(same)
+  if type(name) ~= "string" or name == "" then return old end
+  return (L["  (take it along: it leads to %s)"]):format(name)
+end
+
 local function StepText(s, upcoming, short)
   if not s then return L["Route finished"] end
   if s.k == "chapter" then return ns.ChName(s) end   -- (review round 4) going back onto the first header
@@ -1103,10 +1143,15 @@ local function StepText(s, upcoming, short)
     if s.k == "accept" and s.item then t = t .. L["  (starts from an item: Questdon's quest item button)"] end
     if s.ins then t = t .. L["  (inside the dungeon)"] elseif s.grp then t = t .. L["  (group quest)"] end
     if s.k == "accept" and s.esc then t = t .. L["  (escort: starts at once)"] end
-    if s.k == "accept" and s.bc then t = t .. L["  (take it along: it leads to the next zone)"] end
+    if s.k == "accept" and s.bc then t = t .. ns.BreadcrumbHint(s) end
     -- (13.10.) a hint players gave for this quest (STEP_NOTES)
     local note = s.q and ns.STEP_NOTES[s.q] and ns.STEP_NOTES[s.q][s.k]
     if note then t = t .. note end
+    -- (24.10.) a hint of the correction list (leveldon-build/korrekturen.json, kind note): the step's own text per language
+    if s.nt then
+      local nt = s.nt[ns.LOCALE] or s.nt.enUS
+      if nt then t = t .. "  (" .. nt .. ")" end
+    end
     -- (15.10., Daniel's mage Zip: "while doing the murlocs, kill Croaky: he drops a quest head item"; then "there
     -- must be something on the web for that") a mob here drops the start of a quest (CMaNGOS, ATT; the builder
     -- puts it on the kill step): kill it too, until you have that quest or did it
@@ -2319,7 +2364,17 @@ local function Compose()
         -- with the route's own mobs within DO_NEAR (one visit, e.g. the kobolds of Echo Ridge); else the first
         -- step within PASS_NEAR (on the way to it when that is a mob area)
         local prevC = out[last]
-        if NPC_KIND[c.k] and prevC and NPC_KIND[prevC.k] and Within(prevC, c, NEAR.npc) then
+        local wayJ
+        if c.way and MOB_KIND[c.k] then
+          -- (24.10., Daniel's Kamarace: Shhh! We're Hunting Kobolds "on the way to Goldshire") a kill spot on the road to the
+          -- next area (way=true in the chain's row, Korrekturliste): done before the route leaves for it, at the end of this one
+          local j = last
+          while out[j + 1] and out[j + 1].k ~= "chapter" do j = j + 1 end
+          if out[j + 1] then wayJ = j end
+        end
+        if wayJ then
+          found = wayJ
+        elseif NPC_KIND[c.k] and prevC and NPC_KIND[prevC.k] and Within(prevC, c, NEAR.npc) then
           found = last
         else
           local chapters, pass = 0, nil
@@ -4582,6 +4637,19 @@ function ns.SetLine(key)
   return true
 end
 
+-- (25.10.) the window on or off from elsewhere (Options.lua: only record), saved like /lvd does
+function ns.SetWindowShown(v)
+  if not panel then return end
+  if v and not panel:IsShown() then panel:FadeIn() Set("shown", true) Refresh()
+  elseif not v and panel:IsShown() then panel:FadeOut() Set("shown", false) end
+end
+function ns.WindowShown() return panel ~= nil and panel:IsShown() or false end
+function ns.ToggleWindow() ns.SetWindowShown(not ns.WindowShown()) end
+-- (25.10., Daniel: "a key for the window") Bindings.xml calls this; the names show in Key Bindings > AddOns
+BINDING_HEADER_LEVELDON = "Leveldon"
+BINDING_NAME_LEVELDON_TOGGLE = L["Show or hide the window"]
+LeveldonToggleWindow = function() pcall(ns.ToggleWindow) end
+
 SLASH_LEVELDON1 = "/lvd"
 SLASH_LEVELDON2 = "/leveldon"
 SlashCmdList.LEVELDON = function(msg)
@@ -4652,12 +4720,13 @@ SlashCmdList.LEVELDON = function(msg)
     Update(false)   -- (review round 4) not the first-start pass over service steps
     print(L["|cff3fa9f5Level|rdon: solo "] .. (db.solo and L["on: no group and escort quests"] or L["off"]) .. ".")
   elseif msg == "back" then Skip(-1)
+  elseif msg == "quiet" or msg == "record" then if ns.SetRecordOnly then ns.SetRecordOnly() end -- (25.10.)
   elseif msg == "reset" then
     marks, bindAtStep = setmetatable({}, { __mode = "k" }), nil
     cur = StartIndex()
     Update(true)
     print(L["|cff3fa9f5Level|rdon: route started again from your level."])
   elseif panel then
-    if panel:IsShown() then panel:FadeOut() Set("shown", false) else panel:FadeIn() Set("shown", true) Refresh() end
+    ns.ToggleWindow()
   end
 end

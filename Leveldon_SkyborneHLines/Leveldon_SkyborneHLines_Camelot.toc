@@ -2,7 +2,7 @@
 ## Title: |cff3fa9f5Level|rdon Lines: Windshaper Skyborne
 ## Notes: Leveldon's levels 1 to 30 for Windshaper Skyborne through the other start areas, loaded only when you pick one.
 ## Author: DonCoohd
-## Version: 0.2.5-beta
+## Version: 0.2.6-beta
 ## Dependencies: Leveldon
 ## LoadOnDemand: 1
 

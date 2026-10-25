@@ -17,11 +17,54 @@ end
 local function Panel() return rawget(_G, "LeveldonPanel") end
 local function Redraw() if ns.LeveldonRefresh then pcall(ns.LeveldonRefresh) end end
 
+-- (25.10., Daniel: "lock, size and opacity like in Questdon") the window's own values are the Style kit's: they are
+-- saved in LeveldonCharDB.panel by Leveldon.lua Get/Set (locked, scale, alpha, combatFade); with the window up the
+-- kit's methods do the work, before that the value is written straight to the saved table.
+local function Saved(key) local t = CharDB().panel return t and t[key] end
+local function SaveRaw(key, v) local c = CharDB() c.panel = c.panel or {} c.panel[key] = v end
+local function Kit() return ns.Style end
+
 -- key -> { get, set, default }
 local O = {
-  plain = { default = false,
-    get = function() return CharDB().plain == true end,
-    set = function(v) CharDB().plain = v and true or nil if ns.LvdWin then pcall(ns.LvdWin.ApplyPlain, Panel()) end end },
+  locked = { default = false,
+    get = function() return Saved("locked") == true end,
+    set = function(v) local p = Panel() v = v and true or false if p and p.SetLocked then p:SetLocked(v) else SaveRaw("locked", v) end end },
+  scale = { default = 1,
+    get = function() local p = Panel() return tonumber(p and p._scale or Saved("scale")) or 1 end,
+    set = function(v) local p = Panel() if p and p.SetPanelScale then p:SetPanelScale(v) else SaveRaw("scale", v) end end },
+  alpha = { default = 0.82,
+    get = function() local p = Panel() local k = Kit() return tonumber(p and p._bgAlpha or Saved("alpha")) or (k and k.DEFAULT_ALPHA) or 0.82 end,
+    set = function(v) local p = Panel() if p and p.SetBackgroundAlpha then p:SetBackgroundAlpha(v) else SaveRaw("alpha", v) end end },
+  combatFade = { default = false,
+    get = function() return Saved("combatFade") == true end,
+    set = function(v) local p = Panel() local k = Kit() v = v and true or false
+      if p and k and k.CombatFade then k.CombatFade(p, v) else SaveRaw("combatFade", v) end end },
+  -- (25.10., Daniel: "no background and no frame the default, also with the arrow") on is the unset value now
+  plain = { default = true,
+    get = function() return CharDB().plain ~= false end,
+    set = function(v) if v then CharDB().plain = nil else CharDB().plain = false end if ns.LvdWin then pcall(ns.LvdWin.ApplyPlain, Panel()) end end },
+  -- (25.10., Daniel: "for Leveldon an option Arrow instead of the compass in the list; the arrow must be able to lose
+  -- its frame and background") Questdon's single direction arrow leads instead of the compass in Leveldon's window and
+  -- in the quest list (QuestdonAPI.SetArrowMode keeps the values before). The state is read from the settings.
+  arrowOnly = { default = false,
+    get = function()
+      local a = rawget(_G, "QuestdonAPI")
+      return CharDB().compass == false and a ~= nil and a.ArrowMode ~= nil and a.ArrowMode() or false
+    end,
+    set = function(v)
+      local a = rawget(_G, "QuestdonAPI")
+      if not (a and a.SetArrowMode) then print(L["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."]) return end
+      v = v and true or false
+      if v then CharDB().compass = false else CharDB().compass = nil end
+      Redraw()
+      a.SetArrowMode(v)
+    end },
+  arrowPlain = { default = true,
+    get = function() local a = rawget(_G, "QuestdonAPI") if a and a.ArrowPlain then return a.ArrowPlain() end return true end,
+    set = function(v)
+      local a = rawget(_G, "QuestdonAPI")
+      if a and a.SetArrowPlain then a.SetArrowPlain(v) else print(L["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."]) end
+    end },
   compass = { default = true,
     get = function() return CharDB().compass ~= false end,
     set = function(v) if v then CharDB().compass = nil else CharDB().compass = false end Redraw() end },
@@ -59,15 +102,51 @@ local O = {
 }
 ns.LVD_OPTIONS = O -- (tests)
 
+-- (25.10., Daniel: "can players only collect and share data?") one switch: the window and everything Leveldon shows
+-- or marks by itself off, the recording and the shared route times on. The values before are kept per character
+-- (LeveldonCharDB.recordOnlyPrev) and come back with the second click. /lvd quiet does the same.
+local RECORD_ONLY = { rec = true, share = true, raidMarks = false, hideTracker = false, bag = false, camp = false, bagMarks = false }
+ns.LVD_RECORD_ONLY = RECORD_ONLY -- (tests)
+function ns.RecordOnly() return type(CharDB().recordOnlyPrev) == "table" end
+function ns.SetRecordOnly(on)
+  if on == nil then on = not ns.RecordOnly() end
+  if on == ns.RecordOnly() then return end
+  if on then
+    local prev = { window = ns.WindowShown and ns.WindowShown() or false }
+    for k, v in pairs(RECORD_ONLY) do
+      prev[k] = O[k].get()
+      if prev[k] ~= v then pcall(O[k].set, v) end
+    end
+    CharDB().recordOnlyPrev = prev
+    if ns.SetWindowShown then pcall(ns.SetWindowShown, false) end
+    print(L["|cff3fa9f5Level|rdon only records your run now. /lvd quiet brings the window and your settings back."])
+  else
+    local prev = CharDB().recordOnlyPrev
+    CharDB().recordOnlyPrev = nil
+    for k in pairs(RECORD_ONLY) do
+      if prev[k] ~= nil and O[k].get() ~= prev[k] then pcall(O[k].set, prev[k]) end
+    end
+    if ns.SetWindowShown then pcall(ns.SetWindowShown, prev.window ~= false) end
+    print(L["|cff3fa9f5Level|rdon: window and settings are back."])
+  end
+end
+
 -- the options window reads and writes through this table: db[key] is the option's value
 local proxy = setmetatable({}, {
   __index = function(_, k) local o = O[k] if o then return o.get() end end,
   __newindex = function(_, k, v) local o = O[k] if o then o.set(v) end end,
 })
 
+local SMIN, SMAX = 0.6, 1.6
 local PAGES = { { items = {
+  { key = "locked", name = "Lock window", tip = "The window can no longer be dragged." },
+  { key = "scale", kind = "slider", name = "Size", tip = "Size of the whole window and its text. Ctrl + mouse wheel over the window does the same.", min = SMIN, max = SMAX, step = 0.05 },
+  { key = "alpha", kind = "slider", name = "Background opacity", tip = "How dark the window's background is. Shift + mouse wheel over the window does the same.", min = 0, max = 1, step = 0.05 },
+  { key = "combatFade", name = "Dim in combat", tip = "The window fades to a little more than a third of its strength while you fight." },
   { key = "plain", name = "No background and frame", tip = "Hides the window's background, its frame and the boxes behind the chapter and the current step: only the text, the compass and the buttons up top stay." },
   { key = "compass", name = "Compass in the current step", tip = "A compass beside the current step that points to its place. With it on, Questdon's own arrow steps aside while Leveldon's window is open." },
+  { key = "arrowOnly", name = "Arrow instead of the compass", tip = "Questdon's direction arrow leads you to the step instead of the compass in Leveldon's window and in the quest list. Switch off again and the compass and your earlier arrow settings come back. It changes Questdon's settings for all your characters." },
+  { key = "arrowPlain", name = "Arrow: no background and frame", tip = "Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow." },
   { key = "raidMarks", name = "Markers over the next NPC", tip = "A marker over the head of the NPC or mob the current step is about." },
   { key = "hideTracker", name = "Hide the game's quest tracker", tip = "Leveldon and Questdon show your quests; the game's own list on the right goes away. A button in the quest log brings it back." },
   { key = "bag", name = "Sleeping bag reminder", tip = "When you rest, a hint to lie in your sleeping bag for 3 minutes: 3 % more XP for 2 hours." },
@@ -85,19 +164,23 @@ local TOOLS = {
   { "Choose your professions", "Open", function() Cmd("profs") end, "Pick the professions the route plans in: their trainers, tools and skill-ups come along the way." },
   { "Report this step", "Open", function() Cmd("report") end, "Quest giver not there, route makes no sense, or a remark: it goes into your recording." },
   { "Export your recordings", "Open", function() Cmd("export") end, "Your recordings and reports as text to copy, for a bug report." },
+  { "Reset window position", "Reset", function() local p = Panel() if p and p.ResetPosition then p:ResetPosition() else SaveRaw("pos", nil) end end,
+    "Puts Leveldon's window back to its starting place. The key for it: Key Bindings > AddOns > Leveldon." },
+  { "Only record your run", "On / off", function() ns.SetRecordOnly() end, "Hides the window and switches off what Leveldon shows or marks by itself (markers over NPCs, bag frames, reminders); the recording and the shared route times stay on, so your run still helps the routes. Click again and the window and your settings are back. Also /lvd quiet." },
   { "Skip this step", "Skip", function() Cmd("next") end, "The route goes on with the next step. Right-click a step for more." },
 }
 
 local TABS = {
   { key = "window", title = "Window", pic = "opt_window", icon = "Interface\\Icons\\INV_Misc_Book_09",
     text = "How Leveldon's window looks: background and frame, the compass and the markers.",
-    main = { "plain", "compass" }, more = { "raidMarks", "hideTracker" } },
+    main = { "plain", "compass", "arrowOnly", "arrowPlain" }, more = { "locked", "scale", "alpha", "combatFade", "raidMarks", "hideTracker" },
+    tools = { "Reset window position" } },
   { key = "route", title = "Route", pic = "opt_route", icon = "Interface\\Icons\\INV_Misc_Map_01",
     text = "What the route plans in for you: dungeons, group quests, professions and the small XP helpers.",
     main = { "dungeons", "solo", "bag", "camp", "bagMarks" }, tools = { "Choose your route", "Choose your professions" } },
   { key = "share", title = "Sharing and data", pic = "opt_share", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
     text = "What Leveldon writes along and shares with other Leveldon players to make the routes better.",
-    main = { "share", "rec" }, tools = { "Report this step", "Export your recordings" } },
+    main = { "share", "rec" }, tools = { "Only record your run", "Report this step", "Export your recordings" } },
   { key = "help", title = "Help", pic = "opt_help", icon = "Interface\\Icons\\INV_Misc_QuestionMark",
     text = "Your route and the commands.", status = true, tools = { "Skip this step" } },
 }

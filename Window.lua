@@ -557,7 +557,7 @@ end
 -- without background, frame and title bar background, and the speedrun line, chapter banner and station without
 -- their own fills; text, compass, bars and the title bar's buttons stay
 function W.ApplyPlain(panel)
-  local plain = DB().plain == true
+  local plain = DB().plain ~= false -- (25.10.) on unless switched off
   if panel and panel.SetChromeHidden and (panel.IsChromeHidden and panel:IsChromeHidden()) ~= plain then panel:SetChromeHidden(plain) end
   -- (17.10.) not ipairs over { runFrame, banner, station }: with the speedrun line off runFrame is nil and ipairs
   -- stopped right there, so the chapter's and the step's boxes stayed

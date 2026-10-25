@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="LEVELDON_TOGGLE" header="LEVELDON" category="ADDONS">
+		if LeveldonToggleWindow then LeveldonToggleWindow() end
+	</Binding>
+</Bindings>

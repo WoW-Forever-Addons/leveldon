@@ -1,5 +1,21 @@
 # Changes
 
+## 0.2.6 Beta
+
+- **Your language:** Leveldon now speaks French, Spanish (Spain and Latin America), Brazilian Portuguese, Russian, Korean and Traditional Chinese, besides English and German.
+- **Window settings:** Options > Window > More settings now has lock, size, background opacity and dim in combat, as in Questdon, plus a button to put the window back to its starting place.
+- **Arrow instead of the compass:** Options > Window: Questdon's direction arrow leads you to the step instead of the compass in Leveldon's window and in the quest list (needs Questdon 1.3.11); switched off again, everything comes back as it was. "Arrow: no background and frame" hides the plate behind the arrow's text.
+- **See-through by default:** the window has no background and frame now unless you switch them on (Options > Window > "No background and frame"); the same for the arrow's plate.
+- **A key for the window:** Key Bindings > AddOns > Leveldon > "Show or hide the window" (a new file, so restart the game after updating).
+- **Only record your run:** one switch hides the window and Leveldon's markers, bag frames and reminders while the recording and the shared route times go on. A second click brings everything back. Options > Sharing and data, or /lvd quiet.
+- **Quicker routes:** quests the old routes took and then dropped come back where they pay off, for example Timberling Sprouts, The Coast Isn't Clear, Satyr Horns, Souvenirs of Death and Sharptalon's Claw, and Philmor's Favor in Stormwind for the Alliance. Most class routes end sooner (about 10 minutes, up to 37), none later.
+- **Tauren shamans** now get their earth totem: Call of Earth comes in at level 4 in Camp Narache.
+- **Quests next to their giver** are done right after you take them (Unwelcome Guests, The Great Outdoors, Hilary's Necklace, Trouble in the Valley and others).
+- **Zephras Isle (Skyborne):** Anchors right after you take it, then an east loop with the Windstones on the way; warriors get The Warrior's Path.
+- **Selling:** full bags never send you on a detour; you sell at the next hub or at a vendor right by your way. Only a hunter without ammo goes out of the way.
+- **Profession books:** a book that was in your bags and is gone counts as read.
+- **Humans:** priests buy the Skin of Sweet Rum in Goldshire and stop in Stormwind at level 18; the kobolds for Shhh! are done on the way to Goldshire; hints for the Grape Manifest and the Mining Pick.
+
 ## 0.2.5 Beta
 
 - **Choose your route:** after your start area, level through any other start area of your side (Options > Route or `/lvd line`), with the hours, quests and reputation of each choice. You can switch in the middle of the route.

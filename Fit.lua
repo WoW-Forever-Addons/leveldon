@@ -370,7 +370,9 @@ function ns.CheckSell()
     end
   end
   local why
-  if ns.FreeSlots and ns.FreeSlots() <= 1 then why = "bags" end
+  -- (25.10., review round 8) a hunter without any ammunition first: with full bags too he must reach a vendor that sells it
+  if ns.IsHunter and ns.IsHunter() and ns.AmmoCount and ns.AmmoCount() <= 0 then why = "ammo" end
+  if not why and ns.FreeSlots and ns.FreeSlots() <= 1 then why = "bags" end
   -- (12.10., Daniel's hunter: "less than 100 arrows and I should keep killing") ammunition running out: the next
   -- vendor that sells it, whatever the step
   local AMMO_LOW = 100
@@ -401,7 +403,10 @@ function ns.CheckSell()
   local dest = steps[cur]
   local dPD = dest.m == here and dest.x and a.DistanceTo(dest.m, dest.x / 100, dest.y / 100) or nil
   local atHub = type(dPD) == "number" and HUB_STEP[dest.k] == true and dPD <= HUB_WALK
-  local urgent = (why == "bags" and ns.FreeSlots and ns.FreeSlots() <= 0) or (why == "ammo" and ns.AmmoCount and ns.AmmoCount() <= 0)
+  -- (24.10., Daniel's Skyborne warrior on Zephras Isle: bags full 26 times in 24 minutes, "no selling in the middle of a
+  -- quest", valid for every route) full bags are no reason for a detour either: the stop comes at a hub or on the way
+  -- (above); only a hunter without any ammunition cannot go on
+  local urgent = why == "ammo" and ns.AmmoCount and ns.AmmoCount() <= 0
   for _, v in ipairs(list) do
     if v.m == here and (why ~= "ammo" or v.ammo) then
       local d = a.DistanceTo(v.m, v.x / 100, v.y / 100)
