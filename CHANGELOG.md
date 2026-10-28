@@ -1,5 +1,13 @@
 # Changes
 
+## 0.2.7 Beta
+
+- **Druids to Moonglade by Teleport:** Night Elf and Tauren druids cast Teleport: Moonglade instead of walking there (a new step "Cast Teleport: Moonglade", done when you cast it). Druid routes end sooner: Night Elves about 20 to 50 minutes, Tauren about 47 to 84.
+- **Leaving Moonglade:** where no hearthstone follows, a hint points to the druid flight master in Nighthaven, who flies you to Rut'theran Village or Thunder Bluff for free.
+- **Class trainers added:** Undead paladins train with Aramis Hammerhand (Deathknell), Garen Largo (Undercity) and Alodan the Hopeful (Thunder Bluff), only where the route passes anyway. Skyborne hunters, mages, rogues and shamans train on Zephras Isle (Thendal Village, Shen'dar Village). These routes take a few minutes longer for it.
+- **Stonetalon Peak (Night Elves):** a hint to fly back to Astranaar after Journey to Stonetalon Peak instead of walking down the mountain.
+- Some class trainer data from ForeverDB (https://foreverdb.net, GPL v3).
+
 ## 0.2.6 Beta
 
 - **Your language:** Leveldon now speaks French, Spanish (Spain and Latin America), Brazilian Portuguese, Russian, Korean and Traditional Chinese, besides English and German.

@@ -2,7 +2,7 @@
 ## Title: |cff3fa9f5Level|rdon Lines: Undead
 ## Notes: Leveldon's levels 1 to 30 for Undead through the other start areas, loaded only when you pick one.
 ## Author: DonCoohd
-## Version: 0.2.6-beta
+## Version: 0.2.7-beta
 ## Dependencies: Leveldon
 ## LoadOnDemand: 1
 

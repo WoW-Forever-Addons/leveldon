@@ -309,7 +309,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.6"
+local VERSION = "0.2.7"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -1132,6 +1132,9 @@ local function StepText(s, upcoming, short)
   if s.k == "chapter" then return ns.ChName(s) end   -- (review round 4) going back onto the first header
   local kind = Kind(s, upcoming)
   local verb = VERB[kind] or s.k
+  -- (28.10., Daniel: "Moonglade durch Teleport ersetzen") a spell instead of the hearthstone (sp): Teleport: Moonglade
+  -- (28.10.) the English name when the client has no spell data yet (review C walk: "Cast ?")
+  if s.k == "hearth" and s.sp then return (L["Cast %s"]):format(SpellName(s.sp) or ({ [18960] = "Teleport: Moonglade" })[s.sp] or "?") end
   if s.k == "accept" or s.k == "do" or s.k == "turnin" then
     local t = verb .. ": " .. (ns.QName(s) or (L["Quest "] .. s.q))
     if kind == "do" and InLog(s.q) then
@@ -4575,7 +4578,7 @@ f:SetScript("OnEvent", function(_, event, ...)
       ns.Bag.at = Now()
       if db and time then db.bagAt = time() end
     end
-    if unit == "player" and spellID == 8690 and STEPS[cur] and STEPS[cur].k == "hearth" then marks[STEPS[cur]] = true end
+    if unit == "player" and STEPS[cur] and STEPS[cur].k == "hearth" and (spellID == 8690 or spellID == STEPS[cur].sp) then marks[STEPS[cur]] = true end
     Soon()
   else
     Soon()

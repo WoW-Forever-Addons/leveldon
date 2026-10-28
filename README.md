@@ -40,4 +40,6 @@ Leveldon ist ein Levelguide für WoW Forever: die schnellste Route mit Quests, F
 ## Befehle
 `/lvd` (oder `/leveldon`) mit: `next`, `back`, `route`, `line`, `options`, `reset`, `report`, `profs`, `solo`, `dungeons on|off`, `dungeon`, `dungeon no`, `run`, `run reset`, `text 1.3`, `raidmarks`, `marks`, `camp on|off`, `bag on|off`, `bags`, `rec on|off`, `share on|off`, `export`, `mem`.
 
-Trainer-Daten nach WhatsTraining (MIT, siehe `LICENSE-WhatsTraining.txt`), ForeverDB (auch foreverdb.net für Zaubernamen) und CMaNGOS classic-db (beide GPL v3); `Training.lua` steht deshalb unter der GPL v3 (siehe `LICENSE-GPLv3.txt`). Gruppenquests und Händler nach CMaNGOS classic-db und ForeverDB.
+Trainer-Daten nach WhatsTraining (MIT, siehe `LICENSE-WhatsTraining.txt`), ForeverDB (auch foreverdb.net für Zaubernamen) und CMaNGOS classic-db (beide GPL v3); `Training.lua` steht deshalb unter der GPL v3 (siehe `LICENSE-GPLv3.txt`). Gruppenquests und Händler nach CMaNGOS classic-db und ForeverDB. Einige Klassenlehrer (Untote Paladine, Skyborne auf Zephras Isle) nach ForeverDB (Starts.lua, in Forever gesehen).
+
+Data from ForeverDB.net (https://foreverdb.net) (GPL v3 mit Namensnennung, siehe NOTICE.txt der ForeverDB).
