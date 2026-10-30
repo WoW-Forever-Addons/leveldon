@@ -1,5 +1,18 @@
 # Changes
 
+## 0.2.8 Beta
+
+- **Quests instead of grinding:** the routes now follow the way the popular Forever guides level. Alliance (Human, Dwarf, Gnome, Skyborne): Darkshore at 14 to 19 (boat from Stormwind), then Redridge, Ashenvale and Stonetalon, Wetlands and Duskwood; Skyborne skip Loch Modan. Night Elves and the Horde got new chapters in the same spirit. Grinding on the way to 30 drops from several hours to almost nothing for the Alliance and mostly under two hours elsewhere, with many more quests handed in (and the reputation that comes with them).
+- **No quests below their level:** from level 6 you do a quest's objectives when you have reached its level, one level above when that costs little.
+- **Levels 30 to 50 (preview) rebuilt:** this band now knows which quests you already handed in on the way to 30 and no longer plans them again. Faster for most Alliance races.
+- **Quests you took but never handed in** at the end of 1 to 30 are no longer taken; Vital Intelligence is handed in in Brill instead of being dropped.
+- **Items for later show how many:** the tooltip, the loot line in chat and the vendor hint say, for example, "8 needed later".
+- **Trainers:** Dwarf shamans get trainer stops; every race visits its trainer once around level 55; Orc and Troll warlocks train in Orgrimmar instead of the Undercity; a few small trainer stops added.
+- **Flight paths:** more flights where they end the route sooner.
+- **Mor'Ladim and Look To The Stars** move to 30 to 50 (with an "Elite" hint); a hint at the grind before 30 tells Alliance players they can go on with the next chapter from 29.
+- **Quest names** without leftover tags like [CATA+], [A] or [H].
+- Selling stops that meant a trip there and back with the hearthstone are gone (Skyborne Horde, Tauren).
+
 ## 0.2.7 Beta
 
 - **Druids to Moonglade by Teleport:** Night Elf and Tauren druids cast Teleport: Moonglade instead of walking there (a new step "Cast Teleport: Moonglade", done when you cast it). Druid routes end sooner: Night Elves about 20 to 50 minutes, Tauren about 47 to 84.

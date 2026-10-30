@@ -309,7 +309,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.7"
+local VERSION = "0.2.8"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -3129,6 +3129,8 @@ local function CheckKeep(msg)
   if not k or keptSaid[id] or QuestDone(k.q) or InLog(k.q) then return end
   keptSaid[id] = true
   local link = tostring(msg):match("(|c%x+|Hitem:[^|]+|h%[[^%]]+%]|h|r)") or (L["item "] .. id)
+  -- (29.10., Daniel: "wäre cool, wenn dort auch steht wie viele") how many the quest wants, behind the item
+  if (tonumber(k.c) or 1) > 1 then link = link .. " 95i" .. k.c end
   print((L["|cff3fa9f5Level|rdon: keep %s, the route needs it later for \"%s\" (bank it if your bags are full)."]):format(link, k.n or "?"))
 end
 ns.CheckKeep = CheckKeep -- (tests)
@@ -3165,7 +3167,7 @@ do
     local list = {}
     for id, link in pairs(BagItems()) do
       local k = KeepFor(id)
-      if k then list[#list + 1] = ("%s (%s)"):format(link, k.n or "?") end
+      if k then list[#list + 1] = ("%s%s (%s)"):format(link, (tonumber(k.c) or 1) > 1 and (" 95i" .. k.c) or "", k.n or "?") end
     end
     if #list == 0 then return nil end
     table.sort(list)
@@ -3177,7 +3179,10 @@ do
     local id = data and data.id
     if not id and tt and tt.GetItem then local _, link = tt:GetItem() id = link and tonumber(link:match("item:(%d+)")) end
     local k = KeepFor(id)
-    if k and tt and tt.AddLine then tt:AddLine((L["Leveldon: needed later for \"%s\""]):format(k.n or "?"), 0.25, 0.66, 0.96, true) end
+    if k and tt and tt.AddLine then
+      local c = tonumber(k.c) or 1   -- (29.10., Daniel) with how many when the quest wants more than one
+      tt:AddLine(c > 1 and (L["Leveldon: %d needed later for \"%s\""]):format(c, k.n or "?") or (L["Leveldon: needed later for \"%s\""]):format(k.n or "?"), 0.25, 0.66, 0.96, true)
+    end
   end
   ns.KeepTooltip = OnItemTooltip -- (tests)
   if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType and Enum.TooltipDataType.Item then
