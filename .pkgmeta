@@ -24,6 +24,10 @@ move-folders:
   Leveldon/Leveldon_UndeadLines: Leveldon_UndeadLines
 
 required-dependencies:
+  - dondata
+  - donmap
+
+optional-dependencies:
   - questdon
 
 manual-changelog:
