@@ -1,5 +1,16 @@
 # Changes
 
+## 0.2.9 Beta
+
+- **New required addons: DonData and DonMap. Questdon is now optional.** Leveldon reads its quests from **DonData** and points the way with **DonMap**. The CurseForge app installs both for you. If you install by hand, download DonData and DonMap too and put their folders next to Leveldon in `Interface\AddOns`, or Leveldon does not load.
+- **Update note:** new files, so restart the game after updating (a /reload is not enough).
+- **Leveldon without Questdon:** with DonData and DonMap alone the route works: DonMap's arrow leads to the step, in an objective area to its nearest spot, the needles above the NPCs show whom you need, and dungeon names are in your game language. Questdon adds its quest list, its map pins and Leveldon's options window (without Questdon use the /lvd commands).
+- **Arrow instead of the compass by default:** the separate arrow (Questdon's or DonMap's) now leads the way and the step list stays clean. The compass in the current step is still there: switch it on under Options > Window. If you had switched the compass on yourself, it stays on.
+- **Abandoned quests:** a quest you abandoned gets its "take the quest" step back after the route is rebuilt (talent point, trainer).
+- **Lighter:** one timer instead of five, the window does not rebuild while hidden, markers every 2 seconds, and only the route texts of your own class are loaded (Humans 854 KB down to 408 KB).
+- **Recording stays on:** the recording of your run helps make the routes better; `/lvd rec off` switches it off.
+- **Shared base:** the window style comes from DonCore, the common base of the Don addons. It looks the same.
+
 ## 0.2.8 Beta
 
 - **Quests instead of grinding:** the routes now follow the way the popular Forever guides level. Alliance (Human, Dwarf, Gnome, Skyborne): Darkshore at 14 to 19 (boat from Stormwind), then Redridge, Ashenvale and Stonetalon, Wetlands and Duskwood; Skyborne skip Loch Modan. Night Elves and the Horde got new chapters in the same spirit. Grinding on the way to 30 drops from several hours to almost nothing for the Alliance and mostly under two hours elsewhere, with many more quests handed in (and the reputation that comes with them).

@@ -77,7 +77,7 @@ local function Channels()
   if IsInGuild and IsInGuild() then out[#out + 1] = { "GUILD" } end
   if IsInRaid and IsInRaid() then out[#out + 1] = { "RAID" }
   elseif IsInGroup and IsInGroup() then out[#out + 1] = { "PARTY" } end
-  local api = rawget(_G, "QuestdonAPI")
+  local api = ns.QD()
   local id = api and api.ShareChannelID and api.ShareChannelID()
   if type(id) == "number" and id > 0 then out[#out + 1] = { "CHANNEL", id } end
   return out

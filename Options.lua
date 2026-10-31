@@ -46,28 +46,30 @@ local O = {
   -- (25.10., Daniel: "for Leveldon an option Arrow instead of the compass in the list; the arrow must be able to lose
   -- its frame and background") Questdon's single direction arrow leads instead of the compass in Leveldon's window and
   -- in the quest list (QuestdonAPI.SetArrowMode keeps the values before). The state is read from the settings.
-  arrowOnly = { default = false,
+  -- (31.10.2026, Daniel: "standardmäßig den separaten Pfeil an, damit die Questliste cleaner ist") the arrow is the
+  -- default: the compass is on only when switched on (compass == true), unset means the arrow
+  arrowOnly = { default = true,
     get = function()
-      local a = rawget(_G, "QuestdonAPI")
-      return CharDB().compass == false and a ~= nil and a.ArrowMode ~= nil and a.ArrowMode() or false
+      local a = ns.QD()
+      return CharDB().compass ~= true and a ~= nil and a.ArrowMode ~= nil and a.ArrowMode() or false
     end,
     set = function(v)
-      local a = rawget(_G, "QuestdonAPI")
-      if not (a and a.SetArrowMode) then print(L["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."]) return end
+      local a = ns.QD()
+      if not (a and a.SetArrowMode) then print((ns.QDAlone and ns.QDAlone() and L["|cff3fa9f5Level|rdon: this option needs Questdon."] or L["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."])) return end
       v = v and true or false
-      if v then CharDB().compass = false else CharDB().compass = nil end
+      if v then CharDB().compass = nil else CharDB().compass = true end
       Redraw()
       a.SetArrowMode(v)
     end },
   arrowPlain = { default = true,
-    get = function() local a = rawget(_G, "QuestdonAPI") if a and a.ArrowPlain then return a.ArrowPlain() end return true end,
+    get = function() local a = ns.QD() if a and a.ArrowPlain then return a.ArrowPlain() end return true end,
     set = function(v)
-      local a = rawget(_G, "QuestdonAPI")
-      if a and a.SetArrowPlain then a.SetArrowPlain(v) else print(L["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."]) end
+      local a = ns.QD()
+      if a and a.SetArrowPlain then a.SetArrowPlain(v) else print((ns.QDAlone and ns.QDAlone() and L["|cff3fa9f5Level|rdon: this option needs Questdon."] or L["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."])) end
     end },
-  compass = { default = true,
-    get = function() return CharDB().compass ~= false end,
-    set = function(v) if v then CharDB().compass = nil else CharDB().compass = false end Redraw() end },
+  compass = { default = false,
+    get = function() return CharDB().compass == true end,
+    set = function(v) if v then CharDB().compass = true else CharDB().compass = nil end Redraw() end },
   raidMarks = { default = true,
     get = function() return CharDB().raidMarks ~= false end,
     set = function(v) if (CharDB().raidMarks ~= false) ~= (v and true or false) then Cmd("raidmarks") end end },
@@ -96,7 +98,7 @@ local O = {
   share = { default = true,
     get = function() return not AccDB().shareOff end,
     set = function(v) Cmd(v and "share on" or "share off") end },
-  rec = { default = true,
+  rec = { default = true, -- (31.10.2026, Daniel: "standardweise gerne an") Recorder.lua
     get = function() return not AccDB().recOff end,
     set = function(v) Cmd(v and "rec on" or "rec off") end },
 }
@@ -191,7 +193,7 @@ local HELP = "/lvd: show or hide the window\n/lvd options: this window\n/lvd nex
 local win
 local function Window()
   if win then return win end
-  local a = rawget(_G, "QuestdonAPI")
+  local a = ns.QD()
   if not (a and a.NewOptionsWindow) then return nil end
   win = a.NewOptionsWindow({
     frameName = "LeveldonOptions",
@@ -214,7 +216,12 @@ end
 function ns.OpenOptions(tab)
   local w = Window()
   if not w then
-    print(L["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."])
+    -- (31.10.2026, Kritikrunde) without Questdon there is no window at all: say that, not "too old"
+    if ns.QDAlone and ns.QDAlone() then
+      print(L["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."])
+    else
+      print(L["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."])
+    end
     return false
   end
   w.Open(tab)

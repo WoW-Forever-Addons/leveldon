@@ -93,7 +93,7 @@ end
 -- (Daniel 11.10.: "Call of Earth" got "not on your route", but shamans need it for their totems) a class
 -- quest of your class: always wanted; not in the route, it goes in at once (ClassQuestToDo below)
 function ns.IsClassQuest(q)
-  local a = QuestdonAPI
+  local a = ns.QD()
   local g = q and a and a.GetQuest and a.GetQuest(q)
   return type(g) == "table" and type(g.classes) == "table" and #g.classes > 0 or false
 end
@@ -103,7 +103,7 @@ function ns.FitIn(q)
   if not q then return nil end
   local classQ = ns.IsClassQuest(q) and not InRoute(q) and not (DB().extraPlans and DB().extraPlans[q])
   if ns.WantsQuest(q) ~= false and not classQ then return nil end
-  local a = QuestdonAPI
+  local a = ns.QD()
   if not a then return nil end
   local steps, cur = ns.LeveldonSteps(), ns.LeveldonCur()
   local name = (a.QuestTitle and a.QuestTitle(q)) or (L["quest "] .. q)
@@ -238,7 +238,7 @@ end
 function ns.ApplyExtraPlans(out)
   local db = LeveldonCharDB
   if not (db and db.extraPlans) then return end
-  local a = QuestdonAPI
+  local a = ns.QD()
   for q, p in pairs(db.extraPlans) do
     if a and a.IsQuestDone and a.IsQuestDone(q) then
       db.extraPlans[q] = nil
@@ -388,7 +388,7 @@ function ns.CheckSell()
     end
   end
   if not why then return end
-  local a = QuestdonAPI
+  local a = ns.QD()
   local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
   if not (a and a.DistanceTo and here) then return end
   local best, bd
@@ -486,7 +486,7 @@ function ns.CookingAtLearn(out)
 end
 -- a prerequisite of the quest turned in at or after position j (Questdon's data)
 function ns.CookingPrereqAfter(out, q, j)
-  local a = QuestdonAPI
+  local a = ns.QD()
   if not (a and a.GetQuest) then return false end
   local ok, info = pcall(a.GetQuest, q)
   if not (ok and type(info) == "table" and type(info.prereqs) == "table") then return false end
@@ -507,7 +507,7 @@ local NEAR_YD, LEAVE_YD, LOOK = 120, 200, 10
 local AWAY = { turnin = true, accept = true, train = true, learn = true, buy = true, sell = true, fp = true, bind = true, travel = true, hearth = true }
 local pulled = {}
 function ns.FinishNearbyFirst(steps, cur)
-  local a = rawget(_G, "QuestdonAPI")
+  local a = ns.QD()
   local s = steps and steps[cur]
   if not (s and AWAY[s.k] and a and a.DistanceTo and a.ObjectivePoints and a.InQuestLog and a.IsQuestComplete) then return false end
   if ns.TimedRunning and ns.TimedRunning() then return false end
@@ -556,7 +556,7 @@ local function BindKey(s) return ("%d:%.1f:%.1f"):format(s.m, s.x, s.y) end
 -- your home changed (Update): the inns of the route you stand at are bound to it now
 function ns.NoteHome(home)
   local db = LeveldonCharDB
-  local a = rawget(_G, "QuestdonAPI")
+  local a = ns.QD()
   local steps = ns.LeveldonSteps and ns.LeveldonSteps()
   if not (db and home and steps and a and a.DistanceTo) then return end
   for _, s in ipairs(steps) do
@@ -578,14 +578,14 @@ end
 -- the bind step is open and you are in its hub
 function ns.BindOpenHere(s)
   if not (s and s.k == "bind" and s.m and s.x and s.y) or ns.BoundHere(s) then return false end
-  local a = rawget(_G, "QuestdonAPI")
+  local a = ns.QD()
   local d = a and a.DistanceTo and a.DistanceTo(s.m, s.x / 100, s.y / 100)
   return type(d) == "number" and d <= BIND_HUB
 end
 -- you stand at the inn (BIND_AT yards) and the step now is another stop of its visit: the hearthstone first
 function ns.BindFirst(steps, cur)
   local s = steps and steps[cur]
-  local a = rawget(_G, "QuestdonAPI")
+  local a = ns.QD()
   if not (s and s.k ~= "bind" and HUB_STEP[s.k] and s.m and s.x and a and a.DistanceTo) then return false end
   if UnitAffectingCombat and UnitAffectingCombat("player") then return false end
   for j = cur + 1, math.min(#steps, cur + BIND_LOOK) do

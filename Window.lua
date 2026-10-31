@@ -34,7 +34,10 @@ local GREEN, RED, VIOLET = { 0.40, 0.85, 0.45 }, { 0.94, 0.42, 0.37 }, { 0.58, 0
 local COMPASS = 54
 
 local function DB() return LeveldonCharDB or {} end
-local function API() return rawget(_G, "QuestdonAPI") end
+-- (31.10.2026, Daniel: "Leveldon standardmäßig wie Questdon mit dem separaten Pfeil, damit die Questliste cleaner ist")
+-- the compass in the current step only when switched on (true); unset or false: the separate arrow leads
+local function CompassOn() return DB().compass == true end
+local function API() return ns.QD() end
 
 local function Font(parent, size, color, justify)
   local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -358,13 +361,16 @@ local function StationFrame()
   if f.compass then f.dist:SetPoint("TOP", f.compass, "BOTTOM", 0, 0) else f.dist:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -4) end
   f.dist:SetWidth(COMPASS + 20)
   f.lines, f.pips = {}, {}
+  -- (31.10.2026, Leistungsprüfung B10) 10 times a second (was 20). The station hangs in the window (Style.Content sets
+  -- its parent), so it stops with the hidden or collapsed window; until the first build it is not shown at all.
   local elapsed = 0
   f:SetScript("OnUpdate", function(self, dt)
     elapsed = elapsed + (tonumber(dt) or 0)
-    if elapsed < 0.05 then return end
+    if elapsed < 0.1 then return end
     elapsed = 0
     pcall(W.CompassTick)
   end)
+  f:Hide()
   station = f
   return f
 end
@@ -412,7 +418,10 @@ function W.Station(panel, objs, where, width, along)
   for _, fs in ipairs(f.lines) do fs:Hide() end
   for _, fs in ipairs(f.alongs or {}) do fs:Hide() end
   for _, t in ipairs(f.pips) do t:Hide() end
-  local textW = (width or 300) - (f.compass and COMPASS + 26 or 16)
+  -- (31.10.2026) the compass off: hidden, and the text takes its room
+  local cp = CompassOn() and f.compass or nil
+  if f.compass then if cp then f.compass:Show() f.dist:Show() else f.compass:Hide() f.dist:Hide() end end
+  local textW = (width or 300) - (cp and COMPASS + 26 or 16)
   -- (Daniel 12.10.: "the middle part with the count could sit more in the middle") the block centred on the
   -- compass: its height first, then the top
   local need = 12 + (where and 14 or 0)
@@ -443,7 +452,7 @@ function W.Station(panel, objs, where, width, along)
       end
     end
   end
-  local full = math.max(need + 6, f.compass and COMPASS + 18 or 20)
+  local full = math.max(need + 6, cp and COMPASS + 18 or 20)
   local y, n, np = math.max(4, math.floor((full - need) / 2)), 0, 0
   local function Pip()
     np = np + 1
@@ -544,7 +553,7 @@ function W.Station(panel, objs, where, width, along)
   f.way:ClearAllPoints()
   f.way:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -y)
   y = y + 12
-  local h = math.max(y + 2, f.compass and COMPASS + 18 or 20)
+  local h = math.max(y + 2, cp and COMPASS + 18 or 20)
   Style.Content(panel, f, h, { inset = false })
   W.CompassTick()
   return h
@@ -569,7 +578,7 @@ end
 function W.Finish(panel)
   W.ApplyPlain(panel)
   local a = API()
-  local on = panel and panel:IsShown() and not (panel.IsCollapsed and panel:IsCollapsed()) and DB().compass ~= false
+  local on = panel and panel:IsShown() and not (panel.IsCollapsed and panel:IsCollapsed()) and CompassOn()
     and station ~= nil and station.compass ~= nil
   if a and a.SetGuideCompass and W._guide ~= on then
     W._guide = on

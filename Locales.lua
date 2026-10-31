@@ -1,4 +1,7 @@
 local _, ns = ...
+-- (31.10.2026, DONCORE_PLAN.md) the shared Style kit from DonCore (Libs\DonCore\Style.lua) instead of an own copy;
+-- Locales.lua is the first own file. Leveldon changes nothing in the kit, so it takes the shared one like Vitaldon.
+ns.Style = LibStub("DonCore-1.0"):Get("Style", 3)
 
 ---------------------------------------------------------------------------
 -- (12.10., Daniel: "set to German, a lot is still in English") Leveldon's texts in the client's language.
@@ -385,6 +388,9 @@ local deDE = {
   ["Arrow: no background and frame"] = "Pfeil: ohne Hintergrund und Rahmen",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "Blendet die Platte und den Rahmen hinter dem Text des Pfeils aus: nur der Pfeil und die Schrift bleiben. Dasselbe wie Questdons Option für den Pfeil.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: die Pfeil-Option braucht Questdon 1.3.11 oder neuer.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: diese Option braucht Questdon.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: Das Optionsfenster kommt mit Questdon. Ohne Questdon: /lvd-Befehle.",
 }
 
 
@@ -747,6 +753,9 @@ OTHER.frFR = {
   ["Arrow: no background and frame"] = "Flèche : sans fond ni cadre",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "Masque la plaque et le cadre derrière le texte de la flèche : seuls la flèche et l'écriture restent. Identique à l'option de Questdon pour la flèche.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon : l'option de flèche nécessite Questdon 1.3.11 ou plus récent.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon : cette option nécessite Questdon.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon : la fenêtre d'options vient avec Questdon. Sans lui : commandes /lvd.",
 }
 OTHER.esES = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples dan un Thunder Applejack: guárdalo para Sergeant De Vries en Westbrook Garrison, en el edificio de la izquierda; inicia An Apple Treat)",
@@ -1103,6 +1112,9 @@ OTHER.esES = {
   ["Arrow: no background and frame"] = "Flecha: sin fondo ni marco",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "Oculta la placa y el marco detrás del texto de la flecha: solo quedan la flecha y la escritura. Igual que la opción de Questdon para la flecha.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: la opción de la flecha necesita Questdon 1.3.11 o posterior.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: esta opción necesita Questdon.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: la ventana de opciones viene con Questdon. Sin él: comandos /lvd.",
 }
 OTHER.esMX = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples dan un Thunder Applejack: guárdalo para Sergeant De Vries en Westbrook Garrison, en el edificio de la izquierda; inicia An Apple Treat)",
@@ -1459,6 +1471,9 @@ OTHER.esMX = {
   ["Arrow: no background and frame"] = "Flecha: sin fondo ni marco",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "Oculta la placa y el marco detrás del texto de la flecha: solo quedan la flecha y la escritura. Igual que la opción de Questdon para la flecha.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: la opción de la flecha necesita Questdon 1.3.11 o posterior.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: esta opción necesita Questdon.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: la ventana de opciones viene con Questdon. Sin él: comandos /lvd.",
 }
 OTHER.ptBR = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples fazem um Thunder Applejack: guarde-o para Sergeant De Vries em Westbrook Garrison, no prédio à esquerda; ele inicia An Apple Treat)",
@@ -1815,6 +1830,9 @@ OTHER.ptBR = {
   ["Arrow: no background and frame"] = "Seta: sem fundo e moldura",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "Oculta a placa e a moldura atrás do texto da seta: ficam só a seta e a escrita. Igual à opção do Questdon para a seta.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: a opção da seta precisa do Questdon 1.3.11 ou mais novo.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: esta opção precisa do Questdon.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: a janela de opções vem com o Questdon. Sem ele: comandos /lvd.",
 }
 OTHER.ruRU = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples превращаются в Thunder Applejack: сохраните его для Sergeant De Vries в Westbrook Garrison, в здании слева; он начинает An Apple Treat)",
@@ -2171,6 +2189,9 @@ OTHER.ruRU = {
   ["Arrow: no background and frame"] = "Стрелка: без фона и рамки",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "Скрывает плашку и рамку за текстом стрелки: остаются только стрелка и надпись. То же, что параметр Questdon для стрелки.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: для параметра стрелки нужен Questdon 1.3.11 или новее.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: для этого параметра нужен Questdon.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: окно настроек входит в Questdon. Без него: команды /lvd.",
 }
 OTHER.koKR = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (Shiny Red Apples 4개로 Thunder Applejack을 만듭니다: Westbrook Garrison 왼쪽 건물의 Sergeant De Vries에게 줄 수 있게 보관하세요. An Apple Treat 퀘스트가 시작됩니다)",
@@ -2527,6 +2548,9 @@ OTHER.koKR = {
   ["Arrow: no background and frame"] = "화살표: 배경과 테두리 없음",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "화살표 글자 뒤의 판과 테두리를 숨깁니다. 화살표와 글자만 남습니다. Questdon의 화살표 옵션과 같습니다.",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: 화살표 옵션에는 Questdon 1.3.11 이상이 필요합니다.",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: 이 옵션에는 Questdon이 필요합니다.",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: 옵션 창은 Questdon과 함께 제공됩니다. 없으면: /lvd 명령어.",
 }
 OTHER.zhTW = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4個 Shiny Red Apples 可以做成 Thunder Applejack：留著給 Westbrook Garrison 左邊建築裡的 Sergeant De Vries，會開始 An Apple Treat)",
@@ -2883,6 +2907,9 @@ OTHER.zhTW = {
   ["Arrow: no background and frame"] = "箭頭:無背景和邊框",
   ["Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow."] = "隱藏箭頭文字後方的底板和邊框,只留下箭頭和文字。與 Questdon 的箭頭選項相同。",
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon:箭頭選項需要 Questdon 1.3.11 或更新版本。",
+  -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
+  ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon:此選項需要 Questdon。",
+  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon:選項視窗隨 Questdon 提供。沒有它時:/lvd 指令。",
 }
 
 local T = ns.LOCALE == "deDE" and deDE or OTHER[ns.LOCALE] or {}

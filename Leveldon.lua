@@ -155,6 +155,13 @@ local function LoadRoute()
   end
   if #merged.steps == 0 then return false end
   ROUTE = merged
+  -- (31.10.2026, C12) the texts of the other classes go (Merge.lua)
+  if ns.KeepOneClass and ns.RouteSource and ns.RouteSource(rt) then
+    pcall(ns.KeepOneClass, cls, rt)
+    if LeveldonLines and type(LeveldonLines[race]) == "table" then
+      for _, line in pairs(LeveldonLines[race]) do pcall(ns.KeepOneClass, cls, line) end
+    end
+  end
   IndexRoute()
   routeInfo = (L["%s %s%s, %d steps, about %.0f h"]):format(race, cls,
     (lineKey and L[" via %s"]:format(ns.LineTitle(lineKey)) or "") .. (useDg and L[" with dungeons"] or ""), #merged.steps, hours)
@@ -309,7 +316,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.8"
+local VERSION = "0.2.9"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -432,7 +439,7 @@ local HERB = { "Herbalism", "Kräuterkunde", "Herboristerie", "Herboristería", 
 -- chapter by the locale (the routes carry the German name n and the English one ne)
 function ns.PName(sk) return (sk and SpellName(PROF_SPELL[sk])) or SKILL_EN[sk] or "?" end
 function ns.QName(s)
-  local a = s and s.q and QuestdonAPI
+  local a = s and s.q and ns.QD()
   local t = a and a.QuestTitle and a.QuestTitle(s.q)
   if type(t) == "string" and t ~= "" then return t end
   return s and s.n
@@ -570,7 +577,7 @@ local function OnSkillMessage(msg)
 end
 ns.SkillRank = SkillRank -- (tests)
 
-local function API() return QuestdonAPI end
+local function API() return ns.QD() end
 local function Level() return UnitLevel and UnitLevel("player") or 1 end
 local function Map() return C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") or nil end
 -- (11.10.) the player's position on the current map in percent, or nil
@@ -578,7 +585,7 @@ local function Map() return C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestM
 -- with all of Vector2DMixin's functions at every call
 function ns.PlayerXY()
   local m = Map()
-  local a = QuestdonAPI
+  local a = ns.QD()
   if m and a and a.PlayerPosition then
     local ok, qm, qx, qy = pcall(a.PlayerPosition)
     if ok and qm == m and type(qx) == "number" and type(qy) == "number" then return qx * 100, qy * 100 end
@@ -864,7 +871,13 @@ end
 -- open sources, see tools/open/build_training.py) from the last training up to the next even level
 -- (15.10., review round 3) a dungeon's name in the client's language (Questdon has the map's own name), else the
 -- route's English one
+-- (31.10.2026) DonData has it too (DonDataAPI 2): the name in the client's language also without Questdon
 function ns.DgName(id, n)
+  local D = rawget(_G, "DonDataAPI")
+  if type(D) == "table" and type(D.DungeonName) == "function" and id then
+    local ok, name = pcall(D.DungeonName, id)
+    if ok and type(name) == "string" and name ~= "" and name ~= "?" then return name end
+  end
   if not ns._dgNames then
     ns._dgNames = {}
     local ok, list = pcall(function() return QuestdonAPI and QuestdonAPI.Dungeons and QuestdonAPI.Dungeons() end)
@@ -1111,7 +1124,7 @@ local LURES = { [6529] = true }
 -- to starts in the zone of the step, the hint names the quest. Without data on where it leads: the old text.
 function ns.BreadcrumbHint(s)
   local old = L["  (take it along: it leads to the next zone)"]
-  local a = QuestdonAPI
+  local a = ns.QD()
   local targets = a and a.BreadcrumbTargets and a.BreadcrumbTargets(s.q)
   if type(targets) ~= "table" or not s.m then return old end
   local same, other
@@ -2282,6 +2295,9 @@ end
 
 local function Compose()
   laterPlaced = {}
+  -- (31.10.) the retake copies (_retake) are not carried over: a rebuild (talent point, trainer) drops them, so the
+  -- "retaken" mark goes too, else RetakeBefore never puts the accept of a still abandoned quest in again
+  ns._retaken = nil
   ns._composeId = (ns._composeId or 0) + 1
   local chosen = db and db.profs
   for _, s in ipairs(ROUTE.steps) do s._fc = nil end
@@ -3806,6 +3822,14 @@ function ns.LvdObjList(q)
 end
 local function Refresh()
   if not panel then return end
+  -- (31.10.2026, Leistungsprüfung B7: the window was built while hidden, about 60 KB a build) hidden: only marked,
+  -- built when it shows again (OnShow, Build below); Questdon still learns that compass and dock are off (Win.Finish)
+  if not panel:IsShown() then
+    ns._winDirty = true
+    if ns.LvdWin then pcall(ns.LvdWin.Finish, panel) end
+    return
+  end
+  ns._winDirty = nil
   if ns.LF.TickReset then ns.LF.TickReset() end -- (17.10.) any build counts as fresh for the ticker
   panel:ClearRows()
   local Win = ns.LvdWin
@@ -4381,6 +4405,17 @@ local function Build()
         end, tooltip = { L["Read the whole quest"], nil, L["Shift-click a step: the same."] } },
     },
   })
+  -- (31.10.2026, B7) built when it shows again after changes while hidden; hidden: Questdon's compass and dock off
+  local onShow, onHide = panel:GetScript("OnShow"), panel:GetScript("OnHide")
+  panel:SetScript("OnShow", function(self, ...)
+    if onShow then onShow(self, ...) end
+    if ns._winDirty then pcall(Refresh) end
+  end)
+  panel:SetScript("OnHide", function(self, ...)
+    if onHide then onHide(self, ...) end
+    if ns.LvdWin then pcall(ns.LvdWin.Finish, self) end
+  end)
+  ns._winDirty = true
   if Get("shown") ~= false then panel:FadeIn() end
 end
 
@@ -4395,6 +4430,21 @@ if ns.Track then
   MarkTick = ns.Track("mark tick", MarkTick)
   TravelTick = ns.Track("travel tick", TravelTick)
   ApplyTracker = ns.Track("tracker hide", ApplyTracker)
+end
+-- (31.10.2026, Leistungsprüfung B9: the half second's ticker hid Blizzard's tracker in its beat) the check when the game
+-- may show the tracker again (entering the world, a new zone, the watch list) and every two seconds (PLAYER_LOGIN);
+-- the quest log button until it sits at its best place
+function ns.LF.TrackerCheck()
+  if not db then return end
+  if (db.hideTracker ~= false or trackerHidden) and not InCombat() then pcall(ApplyTracker) end
+  if not logButton or logButton._rank > 1 then pcall(MakeLogButton) end
+end
+ns.LF.trackerEvents = ns.CreateFrame("Frame")
+ns.LF.trackerEvents:SetScript("OnEvent", function() pcall(ns.LF.TrackerCheck) end)
+for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "QUEST_WATCH_LIST_CHANGED", "QUEST_ACCEPTED" }) do
+  pcall(ns.LF.trackerEvents.RegisterEvent, ns.LF.trackerEvents, e)
+end
+if ns.Track then
   -- (23.10., second /lvd mem: "window build" about 58 KB each in the game, 3.6 KB in the bench) the build's parts
   Hints = ns.Track("hints", Hints)
   StepText = ns.Track("step text", StepText)
@@ -4475,16 +4525,20 @@ f:SetScript("OnEvent", function(_, event, ...)
     sessionStart = Now()
     ns.After(6, BagCheck)
     ns.After(4, function() pcall(CheckLogChains) end)
-    ns.NewTicker(1, function() if panel and panel:IsShown() then pcall(ns.LF.TickRefresh) end pcall(MarkTick) end)
+    -- (31.10.2026, Leistungsprüfung B6) the recorder's step watch (also feeds the sharing) runs here, not in a ticker of its own
+    ns.NewTicker(1, function()
+      if panel and panel:IsShown() then pcall(ns.LF.TickRefresh) end
+      pcall(MarkTick)
+      if ns.RecStepWatch then pcall(ns.RecStepWatch) end
+    end)
     -- (0.1.6) Blizzard's quest tracker: hidden again when the game shows it again (one alpha read)
     pcall(ApplyTracker)
     pcall(MakeLogButton)
     ns.After(3, function() pcall(CheckProfsAtStart) end) -- (0.1.6) professions missing: the choice now
-    ns.NewTicker(0.5, function()
-      if (db.hideTracker ~= false or trackerHidden) and not InCombat() then pcall(ApplyTracker) end
-      if not logButton or logButton._rank > 1 then pcall(MakeLogButton) end
-    end)
+    -- (31.10.2026, Leistungsprüfung B9) the tracker check no longer every half second: on the events that show the
+    -- tracker again (ns.LF.TrackerCheck) and in the two seconds' ticker below
     ns.NewTicker(2, function()
+      pcall(ns.LF.TrackerCheck)
       pcall(TravelTick)
       if STEPS[cur] and Kind(STEPS[cur]) == "do" then pcall(MarkUsed, STEPS[cur].q) pcall(Arrow) end
       -- (15.10., Zip at Mirror Lake: "arrow still pointing to Mirror Lake") a turn-in's place asked again: right

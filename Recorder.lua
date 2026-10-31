@@ -5,7 +5,7 @@ local L = ns.L
 -- (0.1.7, Daniel 11.10.: "can the addon write along while I play, walking ways, turn-ins, accepts,
 -- buys, everything, to make better routes from it") The recorder.
 --
--- While you play (option on by default, /lvd rec off), Leveldon writes down per session:
+-- While you play (option off by default since 31.10.2026, /lvd rec on), Leveldon writes down per session:
 --   where you walk (a point every few seconds when you moved, not on a flight),
 --   quests accepted, turned in (with XP and money) and abandoned, level ups, deaths,
 --   flights, hearthstone, every NPC you talk to (once per session),
@@ -63,13 +63,16 @@ local function Usable(v)
   return ok
 end
 
-local function On() return LeveldonDB and LeveldonDB.recOff ~= true end
+-- (31.10.2026, Daniel: "standardweise gerne an, wir brauchen die Daten") on unless switched off with /lvd rec off
+-- (LeveldonDB.recOff).
+-- While off nothing runs: no ticker, no quest log scan, no events (besides PLAYER_LOGIN).
+local function On() return LeveldonDB ~= nil and LeveldonDB.recOff ~= true end
 
 local function Pos()
   local m = C_Map and Call(C_Map.GetBestMapForUnit, "player")
   if not Num(m) then return nil end
   -- (23.10., /lvd mem) Questdon's position (UnitPosition) first: the map's answer is a new vector table each second
-  local api = rawget(_G, "QuestdonAPI")
+  local api = ns.QD()
   if api and api.PlayerPosition then
     local qm, qx, qy = Call(api.PlayerPosition)
     if qm == m and Num(qx) and Num(qy) and not (qx == 0 and qy == 0) then return m, qx * 100, qy * 100 end
@@ -336,14 +339,7 @@ local turnedAt = {}
 local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, e, ...)
   if e == "PLAYER_LOGIN" then
-    Start()
-    lastXP, lastMax, lastLevel = Num(Call(UnitXP, "player")), Num(Call(UnitXPMax, "player")), Level()
-    if C_Timer and C_Timer.NewTicker then
-      ns.NewTicker(SAMPLE, function() pcall(Walk) end)
-      ns.NewTicker(BUCKET, function() pcall(Flush) end)
-      ns.NewTicker(1, function() pcall(StepWatch) end)
-      ns.NewTicker(0.5, function() pcall(InsideWatch) end)
-    end
+    if On() and ns.RecBegin then ns.RecBegin() end
     return
   end
   if not (sess and On()) then return end
@@ -414,13 +410,13 @@ f:SetScript("OnEvent", function(_, e, ...)
     sess.lv2 = math.max(sess.lv2 or sess.lv or 0, Level())
   end
 end)
-for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "PLAYER_LEVEL_UP",
+-- (31.10.2026) the events only while recording (RecBegin, RecStop); PLAYER_LOGIN always
+local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "PLAYER_LEVEL_UP",
   "PLAYER_XP_UPDATE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_ALIVE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
   "MERCHANT_SHOW", "MERCHANT_CLOSED", "TRAINER_SHOW", "TRAINER_CLOSED",
   "LEARNED_SPELL_IN_TAB", "GOSSIP_SHOW", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_GREETING",
-  "TAXIMAP_OPENED", "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_LOGOUT" }) do
-  pcall(f.RegisterEvent, f, e)
-end
+  "TAXIMAP_OPENED", "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_LOGOUT" }
+pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 
 ---------------------------------------------------------------------------
 -- (Daniel 11.10.: "1 to 7 except 3") objectives with time, pauses, group and rested XP, money and bag
@@ -547,10 +543,8 @@ ns.RecPause = function() return more.pause end -- (tests)
 local f2 = ns.CreateFrame("Frame")
 local objPending = false
 f2:SetScript("OnEvent", function(_, e)
-  if e == "PLAYER_LOGIN" then
-    if C_Timer and C_Timer.NewTicker then ns.NewTicker(1, function() pcall(Watch) end) end
-    if C_Timer and C_Timer.After then ns.After(3, function() pcall(ObjectiveWatch) end) end
-  elseif e == "QUEST_LOG_UPDATE" or e == "UNIT_QUEST_LOG_CHANGED" then
+  if not On() then return end
+  if e == "QUEST_LOG_UPDATE" or e == "UNIT_QUEST_LOG_CHANGED" then
     if objPending then return end
     objPending = true
     if C_Timer and C_Timer.After then
@@ -560,13 +554,61 @@ f2:SetScript("OnEvent", function(_, e)
     end
   end
 end)
-for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED" }) do pcall(f2.RegisterEvent, f2, e) end
+local EVENTS2 = { "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED" }
+
+---------------------------------------------------------------------------
+-- (31.10.2026, Leistungsprüfung B6) on and off. One ticker every half second instead of five (0.5, 1, 1, 3 and 60 s):
+-- in or out every tick, pauses, group, instance and bags every second, a walking point every 3 seconds, the minute's
+-- XP line every 60. The guide's step watch (StepWatch, also for the sharing) runs in Leveldon's second ticker.
+---------------------------------------------------------------------------
+local TICK = 0.5
+local recTicker, ticks = nil, 0
+local function Tick()
+  ticks = ticks + 1
+  pcall(InsideWatch)
+  if ticks % (1 / TICK) == 0 then pcall(Watch) end
+  if ticks % (SAMPLE / TICK) == 0 then pcall(Walk) end
+  if ticks % (BUCKET / TICK) == 0 then pcall(Flush) end
+end
+ns.RecTick = Tick -- (tests)
+
+function ns.RecBegin()
+  if sess then return end
+  Start()
+  lastXP, lastMax, lastLevel = Num(Call(UnitXP, "player")), Num(Call(UnitXPMax, "player")), Level()
+  for _, e in ipairs(EVENTS) do pcall(f.RegisterEvent, f, e) end
+  for _, e in ipairs(EVENTS2) do pcall(f2.RegisterEvent, f2, e) end
+  if not recTicker and C_Timer and C_Timer.NewTicker then ticks = 0 recTicker = ns.NewTicker(TICK, Tick) end
+  if C_Timer and C_Timer.After then ns.After(3, function() pcall(ObjectiveWatch) end) end
+end
+
+function ns.RecStop()
+  if recTicker and recTicker.Cancel then pcall(recTicker.Cancel, recTicker) end
+  recTicker = nil
+  for _, e in ipairs(EVENTS) do pcall(f.UnregisterEvent, f, e) end
+  for _, e in ipairs(EVENTS2) do pcall(f2.UnregisterEvent, f2, e) end
+  if sess then
+    pcall(Flush) -- (the last minute's line still goes in: called before recOff is set)
+    sess.endAt = Clock()
+    sess.lv2 = math.max(sess.lv2 or sess.lv or 0, Level())
+  end
+  sess, last, wasInside, onTaxi = nil, nil, nil, false
+  more.objs, more.pause, more.still, more.group, more.inst = nil, nil, nil, nil, nil
+end
 
 -- /lvd rec, /lvd rec on, /lvd rec off
 function ns.RecCommand(arg)
   LeveldonDB = LeveldonDB or {}
-  if arg == "off" then LeveldonDB.recOff = true
-  elseif arg == "on" then LeveldonDB.recOff = nil end
+  if arg == "off" then
+    if sess then ns.RecStop() end
+    LeveldonDB.recOff = true
+  elseif arg == "on" then
+    LeveldonDB.recOff = nil
+    if not sess and (not IsLoggedIn or IsLoggedIn()) then ns.RecBegin() end
+  end
+  -- (31.10.2026) also while off: what is kept from before
+  local r = type(LeveldonDB.rec) == "table" and LeveldonDB.rec or nil
+  if r and r ~= rec and type(r.sessions) == "table" then rec = r Recount() end
   local n = rec and #rec.sessions or 0
   print((L["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."]):format(
     On() and L["on"] or L["off"], n, counts.events, counts.points, LeveldonDB.reports and #LeveldonDB.reports or 0))

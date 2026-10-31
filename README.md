@@ -1,11 +1,12 @@
-# Leveldon 0.2.6 Beta (WoW Forever)
+# Leveldon 0.2.9 Beta (WoW Forever)
 
 Leveldon ist ein Levelguide für WoW Forever: die schnellste Route mit Quests, Flugpunkten, Ruhestein, Lehrern und Händlern, Schritt für Schritt, mit Questdons Kompass. Die Routen sind pro Volk geplant, die Quests und Lehrer deiner Klasse liegen dort, wo sie am wenigsten Weg kosten.
 
 **Beta:** Diese Version enthält die Routen für **Stufe 1 bis 30**. Die Stufen 30 bis 60 sind als ungetestete Vorschau dabei. Texte gibt es auf Englisch, Deutsch, Französisch, Spanisch, Portugiesisch (Brasilien), Russisch, Koreanisch und traditionellem Chinesisch.
 
 ## Installation
-- **Questdon** ist Pflicht (ab 1.3.6, für Leveldons Optionsfenster 1.3.9 oder neuer). Leveldon nutzt Questdons Kompass, Questdaten und Fenster.
+- **DonData** (Questdaten) und **DonMap** (Pfeil, Kompass, Karte) sind Pflicht, die CurseForge-App installiert sie mit. Von Hand: die Ordner `DonData` und `DonMap` neben `Leveldon` kopieren.
+- **Questdon** ist seit 0.2.9 optional. Mit Questdon gibt es dessen Questliste, Kartenpins und Leveldons Optionsfenster (Questdon 1.3.9 oder neuer); ohne Questdon zeigt DonMaps Pfeil den Weg, eingestellt wird über die `/lvd`-Befehle.
 - Den Ordner `Leveldon`, die Routenordner `Leveldon_<Volk>` und `Leveldon_<Volk>Lines` in `Interface\AddOns` kopieren. Geladen wird nur die Route deines Volks, die Lines-Ordner erst, wenn du eine andere Route wählst.
 - Nach dem Einspielen das Spiel neu starten (ein /reload reicht bei neuen Dateien nicht).
 

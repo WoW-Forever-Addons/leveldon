@@ -112,7 +112,7 @@ end
 -- Questdon's API as Leveldon calls it
 local apiSaved
 local function WrapAPI()
-  local api = rawget(_G, "QuestdonAPI")
+  local api = ns.QD()
   if type(api) ~= "table" or apiSaved then return end
   apiSaved = {}
   for k, f in pairs(api) do
@@ -123,7 +123,7 @@ local function WrapAPI()
   end
 end
 local function UnwrapAPI()
-  local api = rawget(_G, "QuestdonAPI")
+  local api = ns.QD()
   if type(api) == "table" and apiSaved then
     for k, f in pairs(apiSaved) do api[k] = f end
   end

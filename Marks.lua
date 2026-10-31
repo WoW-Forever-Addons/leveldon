@@ -23,7 +23,7 @@ local stats = { marked = 0, failed = 0, secret = 0, seen = 0 }
 M.stats = stats
 
 local function DB() return LeveldonCharDB or {} end
-local function API() return rawget(_G, "QuestdonAPI") end
+local function API() return ns.QD() end
 
 local function Lower(s)
   if type(s) ~= "string" then return nil end
@@ -32,7 +32,7 @@ local function Lower(s)
 end
 
 -- what the current step wants marked: { icon, ids = { [creatureID] = true }, names = { [lower name] = true } }
-function M.Want()
+local function Build()
   local steps, cur = ns.LeveldonSteps and ns.LeveldonSteps(), ns.LeveldonCur and ns.LeveldonCur()
   local s = type(steps) == "table" and cur and steps[cur]
   if not s then return nil end
@@ -86,6 +86,19 @@ function M.Want()
   if not next(w.ids) and not next(w.names) then return nil end
   return w
 end
+-- (31.10.2026, Leistungsprüfung B8: three to four tables for every nameplate, every second) kept for the step until
+-- the quest log changes (an objective done, a turn-in ready) or two seconds pass
+local cache = { gen = 0 }
+function M.Want()
+  local steps, cur = ns.LeveldonSteps and ns.LeveldonSteps(), ns.LeveldonCur and ns.LeveldonCur()
+  local s = type(steps) == "table" and cur and steps[cur] or nil
+  local now = GetTime and GetTime() or 0
+  if cache.s == s and cache.gen == cache.at and now - (cache.t or -1e9) < 2 and now >= (cache.t or 0) then return cache.w end
+  local w = Build()
+  cache.s, cache.at, cache.t, cache.w = s, cache.gen, now, w
+  return w
+end
+function M.Forget() cache.gen = cache.gen + 1 end -- (tests and quest log events)
 
 local function CreatureID(unit)
   local ok, g = pcall(UnitGUID, unit)
@@ -122,7 +135,7 @@ end
 -- (0.1.8, Daniel 12.10.: "nice markers that fit; not a ! over Blizzard's !") Not the raid icons: the
 -- compass needle of Questdon, small, pointing down at the NPC, in the colour of what to do there, with a soft
 -- glow that pulses. Blizzard's ! and ? stay what they are.
-local MEDIA = "Interface\\AddOns\\Questdon\\Media\\"
+local MEDIA = "Interface\\AddOns\\DonMap\\Media\\" -- (31.10.2026) DonMap has the same needles; Questdon may be missing
 -- (Daniel 12.10.: "our arrow may be more striking") bigger, a brighter halo and a small bob down to the NPC
 local SIZE, LIFT, BOB = 46, 12, 7
 local COLORS = {
@@ -255,9 +268,15 @@ end
 function M.Frames() return frames end -- (tests)
 
 -- all nameplates shown now (the route moved on next to the NPC)
+local seen = {}
 function M.Scan()
   if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
-  local seen = {}
+  -- (31.10.2026, B8) nothing to mark (marks off, no step, the step wants none): only the marks still up go
+  if DB().raidMarks == false or not M.Want() then
+    for unit in pairs(frames) do Release(unit) end
+    return
+  end
+  for k in pairs(seen) do seen[k] = nil end
   local ok, plates = pcall(C_NamePlate.GetNamePlates)
   for _, p in ipairs(ok and type(plates) == "table" and plates or {}) do
     local unit = type(p) == "table" and (p.namePlateUnitToken or (p.UnitFrame and p.UnitFrame.unit))
@@ -286,12 +305,16 @@ Claim()
 
 local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, event, unit)
-  if event == "NAME_PLATE_UNIT_ADDED" then pcall(M.Check, unit)
+  if event == "QUEST_LOG_UPDATE" or event == "UNIT_QUEST_LOG_CHANGED" or event == "QUEST_ACCEPTED" or event == "QUEST_TURNED_IN" then
+    M.Forget()
+  elseif event == "NAME_PLATE_UNIT_ADDED" then pcall(M.Check, unit)
   elseif event == "NAME_PLATE_UNIT_REMOVED" then Release(unit)
   elseif event == "PLAYER_ENTERING_WORLD" then Claim() pcall(Hint) end
 end)
-for _, e in ipairs({ "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "PLAYER_ENTERING_WORLD" }) do pcall(f.RegisterEvent, f, e) end
-if C_Timer and C_Timer.NewTicker then ns.NewTicker(1, function() pcall(M.Scan) end) end
+for _, e in ipairs({ "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE",
+  "UNIT_QUEST_LOG_CHANGED", "QUEST_ACCEPTED", "QUEST_TURNED_IN" }) do pcall(f.RegisterEvent, f, e) end
+-- (31.10.2026, B8) every two seconds (was every second); new nameplates come with their event at once
+if C_Timer and C_Timer.NewTicker then ns.NewTicker(2, function() pcall(M.Scan) end) end
 
 function M.Command()
   local db = DB()

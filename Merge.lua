@@ -84,3 +84,21 @@ function ns.RouteSource(raceTable)
   end
   return nil
 end
+
+-- (31.10.2026, Leistungsprüfung C12: the whole route package stayed in memory, with the texts of every class, about
+-- 0.5 MB for Human) after the route is built only the player's class keeps its overlays (and their dungeon ones), in
+-- the race's table and in every start area line loaded; the bases stay (dungeons on or off, another line build from
+-- them again). The class never changes in the game. Marked with _oneClass = class (tests that switch classes load the
+-- race's file again).
+function ns.KeepOneClass(cls, ...)
+  if type(cls) ~= "string" then return end
+  for i = 1, select("#", ...) do
+    local t = select(i, ...)
+    if type(t) == "table" and type(t.ovl) == "table" then
+      for k in pairs(t.ovl) do
+        if type(k) == "string" and (k:match("^(.-)_dg$") or k) ~= cls then t.ovl[k] = nil end
+      end
+      t._oneClass = cls
+    end
+  end
+end

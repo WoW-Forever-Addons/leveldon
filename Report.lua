@@ -39,7 +39,7 @@ local function Context(c)
   local q = c.quest or (s and s.q) or nil
   local title = c.title
   if c.quest then
-    local a = QuestdonAPI
+    local a = ns.QD()
     title = title or (a and a.QuestTitle and a.QuestTitle(c.quest)) or (L["quest "] .. c.quest)
   else
     title = title or (ns.LeveldonStepText and ns.LeveldonStepText(cur)) or "-"

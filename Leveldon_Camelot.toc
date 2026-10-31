@@ -1,19 +1,23 @@
 ## Interface: 16001
 ## Title: |cff3fa9f5Level|rdon
-## Notes: Level guide for WoW Forever (beta: levels 1 to 30, 30 to 60 as a preview): the fastest route with quests, flight points, hearthstone, trainers and vendors, step by step with Questdon's compass.
-## Notes-deDE: Levelguide für WoW Forever (Beta: Stufe 1 bis 30, 30 bis 60 als Vorschau): die schnellste Route mit Quests, Flugpunkten, Ruhestein, Lehrern und Händlern, Schritt für Schritt mit Questdons Kompass.
+## Notes: Level guide for WoW Forever (beta: levels 1 to 30, 30 to 60 as a preview): the fastest route with quests, flight points, hearthstone, trainers and vendors, step by step with DonMap's arrow and compass.
+## Notes-deDE: Levelguide für WoW Forever (Beta: Stufe 1 bis 30, 30 bis 60 als Vorschau): die schnellste Route mit Quests, Flugpunkten, Ruhestein, Lehrern und Händlern, Schritt für Schritt mit DonMaps Pfeil und Kompass.
 ## Author: DonCoohd
-## Version: 0.2.8-beta
+## Version: 0.2.9-beta
 ## X-Curse-Project-ID: 1741614
-## Dependencies: Questdon
+## Dependencies: DonData, DonMap
+## OptionalDeps: Questdon
 ## SavedVariables: LeveldonDB
 ## SavedVariablesPerCharacter: LeveldonCharDB
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 
+Libs\LibStub\LibStub.lua
+Libs\DonCore\DonCore.lua
+Libs\DonCore\Style.lua
 Locales.lua
+QD.lua
 Mem.lua
 LinesData.lua
-Style.lua
 Training.lua
 Route.lua
 Merge.lua
