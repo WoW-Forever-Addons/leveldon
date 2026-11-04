@@ -3,7 +3,8 @@ local L = ns.L
 
 ---------------------------------------------------------------------------
 -- (17.10., Daniel: "an option to hide background and borders; bring the options menu up to Questdon's look")
--- Leveldon's options window. The window itself is Questdon's (QuestdonAPI.NewOptionsWindow): its look, tabs,
+-- Leveldon's options window. The window itself is DonCore's (Options module, since 01.11.2026; before Questdon's
+-- QuestdonAPI.NewOptionsWindow): its look, tabs,
 -- cards with on/off pills, the explanation on the right and the search stay the same in both addons. Until now
 -- Leveldon's settings were /lvd commands only; each option here reads and writes the same saved value its command
 -- does (several are "on unless switched off"), and the switches that rebuild the route go through the command.
@@ -98,10 +99,31 @@ local O = {
   share = { default = true,
     get = function() return not AccDB().shareOff end,
     set = function(v) Cmd(v and "share on" or "share off") end },
+  -- (02.11.2026, StyleKit 2 step 4, Daniel: "beides wie mockup abschaltbar, aber standard aus") the speedrun line on top and
+  -- the XP bar with the plan's mark in the chapter head (Window.lua)
+  -- (02.11.2026, Daniel: "questdons fenster frei beweglich machen, und standardweise aus") Questdon's quest list hangs under
+  -- Leveldon's window only with this switch
+  dock = { default = false,
+    get = function() return CharDB().dock == true end,
+    set = function(v) CharDB().dock = v and true or nil if ns.LvdWin and Panel() then pcall(ns.LvdWin.Finish, Panel()) end end },
+  runLine = { default = false,
+    get = function() return CharDB().runLine == true end,
+    set = function(v) CharDB().runLine = v and true or nil Redraw() end },
+  xpBar = { default = false,
+    get = function() return CharDB().xpBar == true end,
+    set = function(v) CharDB().xpBar = v and true or nil Redraw() end },
   rec = { default = true, -- (31.10.2026, Daniel: "standardweise gerne an") Recorder.lua
     get = function() return not AccDB().recOff end,
     set = function(v) Cmd(v and "rec on" or "rec off") end },
 }
+-- (04.11.2026, Era-Test) the minimap button (MinimapButton.lua), account-wide in LeveldonDB; nil counts as on. The
+-- item comes from DonCore (ns.MinimapOption), which refreshes the button after the change. Only with DonCore's
+-- MinimapButton, like the item and its place in the Window tab below.
+if ns.MinimapOption then
+  O.minimapButton = { default = true,
+    get = function() return AccDB().minimapButton ~= false end,
+    set = function(v) AccDB().minimapButton = v and true or false end }
+end
 ns.LVD_OPTIONS = O -- (tests)
 
 -- (25.10., Daniel: "can players only collect and share data?") one switch: the window and everything Leveldon shows
@@ -146,6 +168,9 @@ local PAGES = { { items = {
   { key = "alpha", kind = "slider", name = "Background opacity", tip = "How dark the window's background is. Shift + mouse wheel over the window does the same.", min = 0, max = 1, step = 0.05 },
   { key = "combatFade", name = "Dim in combat", tip = "The window fades to a little more than a third of its strength while you fight." },
   { key = "plain", name = "No background and frame", tip = "Hides the window's background, its frame and the boxes behind the chapter and the current step: only the text, the compass and the buttons up top stay." },
+  { key = "dock", name = "Questdon's quest list under the window", tip = "Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself." },
+  { key = "runLine", name = "Speedrun line", tip = "A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns." },
+  { key = "xpBar", name = "XP bar with the plan", tip = "Under the chapter: your experience in this level, with a gold mark where the plan has you now." },
   { key = "compass", name = "Compass in the current step", tip = "A compass beside the current step that points to its place. With it on, Questdon's own arrow steps aside while Leveldon's window is open." },
   { key = "arrowOnly", name = "Arrow instead of the compass", tip = "Questdon's direction arrow leads you to the step instead of the compass in Leveldon's window and in the quest list. Switch off again and the compass and your earlier arrow settings come back. It changes Questdon's settings for all your characters." },
   { key = "arrowPlain", name = "Arrow: no background and frame", tip = "Hides the plate and frame behind the arrow's text: only the arrow and the writing stay. Same as Questdon's option for the arrow." },
@@ -159,6 +184,8 @@ local PAGES = { { items = {
   { key = "share", name = "Share route times", tip = "How the route goes for you (times per step, never names) goes to other Leveldon players through Questdon's channel, and theirs to you. It makes the plan better for everyone." },
   { key = "rec", name = "Record your run", tip = "Leveldon writes along how you play the route (steps, times, deaths, walking). Your reports and recordings help to fix the routes." },
 } } }
+-- (04.11.2026, Era-Test) "Show minimap button" from DonCore, its words already in the game's language
+if ns.MinimapOption then table.insert(PAGES[1].items, 5, ns.MinimapOption()) end
 
 local TOOLS = {
   -- (22.10., Daniel: routes selectable) Lines.lua: the start areas of your faction with hours, quests and reputation
@@ -168,14 +195,15 @@ local TOOLS = {
   { "Export your recordings", "Open", function() Cmd("export") end, "Your recordings and reports as text to copy, for a bug report." },
   { "Reset window position", "Reset", function() local p = Panel() if p and p.ResetPosition then p:ResetPosition() else SaveRaw("pos", nil) end end,
     "Puts Leveldon's window back to its starting place. The key for it: Key Bindings > AddOns > Leveldon." },
-  { "Only record your run", "On / off", function() ns.SetRecordOnly() end, "Hides the window and switches off what Leveldon shows or marks by itself (markers over NPCs, bag frames, reminders); the recording and the shared route times stay on, so your run still helps the routes. Click again and the window and your settings are back. Also /lvd quiet." },
+  { "Only record your run", "On / off", function() ns.SetRecordOnly() end, "Hides the window and switches off what Leveldon shows or marks by itself (markers over NPCs, bag frames, reminders); the recording and the shared route times stay on, so your run still helps the routes. Click again and the window and your settings are back. Also /lvd quiet.",
+    state = function() return ns.RecordOnly() end }, -- (02.11.2026) shown as a switch with its state
   { "Skip this step", "Skip", function() Cmd("next") end, "The route goes on with the next step. Right-click a step for more." },
 }
 
 local TABS = {
   { key = "window", title = "Window", pic = "opt_window", icon = "Interface\\Icons\\INV_Misc_Book_09",
     text = "How Leveldon's window looks: background and frame, the compass and the markers.",
-    main = { "plain", "compass", "arrowOnly", "arrowPlain" }, more = { "locked", "scale", "alpha", "combatFade", "raidMarks", "hideTracker" },
+    main = { "plain", "compass", "arrowOnly", "arrowPlain", "dock", "runLine", "xpBar" }, more = { "locked", "scale", "alpha", "combatFade", "raidMarks", "hideTracker" },
     tools = { "Reset window position" } },
   { key = "route", title = "Route", pic = "opt_route", icon = "Interface\\Icons\\INV_Misc_Map_01",
     text = "What the route plans in for you: dungeons, group quests, professions and the small XP helpers.",
@@ -186,48 +214,58 @@ local TABS = {
   { key = "help", title = "Help", pic = "opt_help", icon = "Interface\\Icons\\INV_Misc_QuestionMark",
     text = "Your route and the commands.", status = true, tools = { "Skip this step" } },
 }
+-- (04.11.2026, Era-Test) the minimap switch under the window's main switches, when DonCore's MinimapButton is there
+if ns.MinimapOption then table.insert(TABS[1].main, "minimapButton") end
 ns.LVD_OPTION_TABS = TABS -- (tests)
 
 local HELP = "/lvd: show or hide the window\n/lvd options: this window\n/lvd next, /lvd back: a step on or back\n/lvd report: report this step\n/lvd profs: professions\n/lvd line [name]: the start area of your route\n/lvd dungeons on|off, /lvd solo\n/lvd reset: start the route again from your level"
 
-local win
-local function Window()
-  if win then return win end
-  local a = ns.QD()
-  if not (a and a.NewOptionsWindow) then return nil end
-  win = a.NewOptionsWindow({
-    frameName = "LeveldonOptions",
+-- (01.11.2026, STYLEKIT_PLAN.md "Schritt 3") the window is DonCore's (Libs\DonCore\Options.lua, loaded by Leveldon's
+-- own toc): one window for every Don addon, Leveldon's tabs under its name. It no longer needs Questdon; with Questdon
+-- its tabs stand next to Questdon's in the same window. Registered at load, so the window lists Leveldon also when
+-- another addon opens it.
+local ID = "Leveldon"
+local function Opt() return LibStub and LibStub("DonCore-1.0", true) and LibStub("DonCore-1.0"):Get("Options", 1) end
+local registered
+local function Register()
+  if registered then return registered end
+  local o = Opt()
+  if not o then return nil end
+  registered = o.Register(ID, {
+    name = "Leveldon", order = 2, addon = "Leveldon",
     wordmark = ns.Style and ns.Style.Wordmark and ns.Style.Wordmark("Level", "don") or "Leveldon",
     media = "Interface\\AddOns\\Leveldon\\Media\\",
     tabs = TABS,
     pages = function() return PAGES end,
     tools = function() return TOOLS end,
     db = function() return proxy end,
-    default = function(key) local o = O[key] if o then return o.default end end,
+    default = function(key) local o2 = O[key] if o2 then return o2.default end end,
     changed = function() end,
     T = function(s) return L[s] end,
+    labels = function(s) return L[s] end,
     status = function() return { ns.RouteInfo and ns.RouteInfo() or "" } end,
     help = function() return L[HELP] end,
-  })
-  return win
+  }) and o
+  return registered
 end
+Register()
 
--- tab: optional tab key; false when Questdon is too old for the window
+-- tab: optional tab key; false only when DonCore's Options module is missing (a broken install)
 function ns.OpenOptions(tab)
-  local w = Window()
-  if not w then
-    -- (31.10.2026, Kritikrunde) without Questdon there is no window at all: say that, not "too old"
-    if ns.QDAlone and ns.QDAlone() then
-      print(L["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."])
-    else
-      print(L["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."])
-    end
+  local o = Register()
+  if not o then
+    print(L["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."])
     return false
   end
-  w.Open(tab)
-  return true
+  return o.Open(ID, tab) ~= nil
+end
+-- (04.11.2026, Era-Test) a switch changed outside the window (the minimap menu, DonCore's "Hide minimap button"): the
+-- open options window shows the new state at once
+function ns.RefreshOptions()
+  local o = Opt()
+  if o and o.win and o.win:IsShown() and o.Render then o.Render() end
 end
 function ns.ToggleOptions()
-  local w = Window()
-  if w then w.Toggle() else ns.OpenOptions() end
+  local o = Register()
+  if o then o.Toggle(ID) else ns.OpenOptions() end
 end

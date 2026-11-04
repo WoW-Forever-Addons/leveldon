@@ -26,7 +26,8 @@ local KIND = { accept = "a", turnin = "t", ["do"] = "d", train = "r", learn = "l
   dungeon = "n", use = "e" }
 local REASON = { giver = "g", route = "r", note = "n" }
 
-local S = { queue = {}, seq = 0, sentAt = -1e9, hourAt = 0, hourN = 0, senders = {}, seen = {}, stats = { sent = 0, got = 0, bad = 0 } }
+local S = { queue = {}, seq = 0, sentAt = -1e9, hourAt = 0, hourN = 0, senders = {}, seen = {}, stats = { sent = 0, got = 0, bad = 0,
+  held = 0, refused = 0, refusedWhy = {}, yelled = 0, gotYell = 0 }, yellTimes = {} } -- (04.11.2026, Era-Test) held: fight or chat lockdown; refused: a way said no
 ns.LvdShare = S
 
 local function DB() LeveldonDB = LeveldonDB or {} return LeveldonDB end
@@ -72,14 +73,41 @@ local function Register()
   S.registered = ok and (res == nil or res == true or res == 0 or res == 1) or false
   return S.registered
 end
+-- (04.11.2026, Era-Test, like Questdon's Exchange.lua) Classic Era refuses addon messages in own channels (Daniel's
+-- /qd nettest in Era: channel InvalidChatType, yell works; Forever the other way round). On Era, and wherever the
+-- channel was refused with InvalidChatType, the lines also go out as YELL to the players nearby, sparingly: at most
+-- YELL_PER_HOUR messages an hour. The refused channel stays out for the session. Forever keeps the channel.
+local YELL_PER_HOUR = 4
+local function IsEra()
+  if S.era == nil then
+    local ok, _, _, _, toc = pcall(GetBuildInfo)
+    toc = ok and tonumber(toc) or nil
+    S.era = (toc and toc >= 11000 and toc < 12000) and true or false
+  end
+  return S.era
+end
+function S.YellWanted() return (IsEra() or S.refusedChannel) and true or false end
+function S.YellLeft()
+  local now, t = Now(), S.yellTimes
+  while t[1] and now - t[1] > 3600 do table.remove(t, 1) end
+  return YELL_PER_HOUR - #t
+end
+-- Name of a send result (Enum.SendAddonMessageResult) or the value itself
+local function ResultName(ok, res)
+  if not ok then return "error" end
+  local enum = Enum and Enum.SendAddonMessageResult
+  if type(enum) == "table" then for k, v in pairs(enum) do if v == res then return tostring(k) end end end
+  return tostring(res)
+end
 local function Channels()
   local out = {}
   if IsInGuild and IsInGuild() then out[#out + 1] = { "GUILD" } end
   if IsInRaid and IsInRaid() then out[#out + 1] = { "RAID" }
   elseif IsInGroup and IsInGroup() then out[#out + 1] = { "PARTY" } end
   local api = ns.QD()
-  local id = api and api.ShareChannelID and api.ShareChannelID()
+  local id = not S.refusedChannel and api and api.ShareChannelID and api.ShareChannelID()
   if type(id) == "number" and id > 0 then out[#out + 1] = { "CHANNEL", id } end
+  if S.YellWanted() and S.YellLeft() > 0 then out[#out + 1] = { "YELL" } end
   return out
 end
 function S.Flush()
@@ -88,10 +116,11 @@ function S.Flush()
   if now - S.sentAt < GAP then return false end
   if now - S.hourAt >= 3600 then S.hourAt, S.hourN = now, 0 end
   if S.hourN >= PER_HOUR then return false end
-  if UnitAffectingCombat and UnitAffectingCombat("player") then return false end
+  local st = S.stats
+  if UnitAffectingCombat and UnitAffectingCombat("player") then st.held = st.held + 1 return false end
   if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown then
     local ok, locked = pcall(C_ChatInfo.InChatMessagingLockdown)
-    if ok and locked then return false end
+    if ok and locked then st.held = st.held + 1 return false end
   end
   local chans = Channels()
   if #chans == 0 then return false end
@@ -109,11 +138,24 @@ function S.Flush()
   local msg = head .. table.concat(body, ";")
   local any = false
   for _, ch in ipairs(chans) do
-    local ok = pcall(C_ChatInfo.SendAddonMessage, PREFIX, msg, ch[1], ch[2])
-    if ok then any = true end
+    local ok, res = pcall(C_ChatInfo.SendAddonMessage, PREFIX, msg, ch[1], ch[2])
+    -- (04.11.2026) the result counts: nil/true/0 went out, anything else is a refusal with its reason (/lvd share)
+    if ok and (res == nil or res == true or res == 0) then
+      any = true
+      if ch[1] == "YELL" then S.yellTimes[#S.yellTimes + 1] = now st.yelled = st.yelled + 1 end
+    else
+      local why = ResultName(ok, res)
+      st.refused = st.refused + 1
+      st.refusedWhy[ch[1]] = why
+      if ch[1] == "CHANNEL" and why == "InvalidChatType" then S.refusedChannel = true end
+    end
   end
   S.sentAt, S.hourN = now, S.hourN + 1
-  if any then S.stats.sent = S.stats.sent + n end
+  if any then S.stats.sent = S.stats.sent + n
+  else
+    -- (04.11.2026) nothing went out: the lines stay for the next send (before, they were lost)
+    for i = #body, 1, -1 do table.insert(S.queue, 1, body[i]) end
+  end
   return any
 end
 
@@ -159,7 +201,8 @@ local function Add(line, who)
 end
 function S.OnMessage(prefix, msg, channel, sender)
   if prefix ~= PREFIX or type(msg) ~= "string" or type(sender) ~= "string" then return end
-  if channel ~= "GUILD" and channel ~= "PARTY" and channel ~= "RAID" and channel ~= "CHANNEL" then return end
+  -- (04.11.2026, Era-Test) also YELL: on Era the players nearby share that way (the channel is refused there)
+  if channel ~= "GUILD" and channel ~= "PARTY" and channel ~= "RAID" and channel ~= "CHANNEL" and channel ~= "YELL" then return end
   local me = Me()
   local full = sender:find("-", 1, true) and sender or (sender .. "-" .. ((me or ""):match("%-(.*)$") or ""))
   if full == me then return end
@@ -172,6 +215,7 @@ function S.OnMessage(prefix, msg, channel, sender)
   S.seen[who] = seen
   if seen[seq] and now - seen[seq] < 600 then return end
   seen[seq] = now
+  if channel == "YELL" then S.stats.gotYell = S.stats.gotYell + 1 end
   local snd = S.senders[who]
   if not snd or now - snd.at >= 3600 then snd = { at = now, n = 0 } S.senders[who] = snd end
   for line in body:gmatch("[^;]+") do
@@ -200,6 +244,21 @@ function ns.ShareCommand(arg)
   for _ in pairs(DB().net or {}) do n = n + 1 end
   print((L["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"]):format(
     On() and L["on"] or L["off"], S.stats.sent, S.stats.got, n))
+  print(ns.ShareDiag())
+end
+
+-- (04.11.2026, Era-Test) the ways for /lvd share: held back (fight, chat lockdown) and refused apart, the reason per
+-- way (Enum.SendAddonMessageResult name), the yells (Era, or the channel refused). Numbers only, no names.
+function ns.ShareDiag()
+  local st = S.stats
+  local why = {}
+  for way, r in pairs(st.refusedWhy) do why[#why + 1] = way .. " " .. r end
+  table.sort(why)
+  local ways = {}
+  for _, ch in ipairs(Channels()) do ways[#ways + 1] = ch[1] end
+  return (L["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"]):format(
+    #ways > 0 and table.concat(ways, ", ") or "-", st.held, st.refused, #why > 0 and (" (" .. table.concat(why, ", ") .. ")") or "",
+    S.YellWanted() and ("%d (%d left this hour, received %d)"):format(st.yelled, math.max(0, S.YellLeft()), st.gotYell) or L["off"])
 end
 
 local f = ns.CreateFrame("Frame")

@@ -53,7 +53,7 @@ local function DB()
   LeveldonCharDB = LeveldonCharDB or {}
   return LeveldonCharDB
 end
-local function Say(msg) print("|cff3fa9f5Level|rdon: " .. msg) end
+local function Say(msg) ns.Say("|cff3fa9f5Level|rdon: " .. msg) end -- (04.11.2026, Era-Test) quiet while only recording
 
 local function InRoute(q)
   for _, s in ipairs(ns.LeveldonSteps and ns.LeveldonSteps() or {}) do if s.q == q then return true end end
@@ -96,6 +96,18 @@ function ns.IsClassQuest(q)
   local a = ns.QD()
   local g = q and a and a.GetQuest and a.GetQuest(q)
   return type(g) == "table" and type(g.classes) == "table" and #g.classes > 0 or false
+end
+
+-- (01.11.2026, the bands 30 to 60 are one route for all classes, planned with the warrior: the Horde warriors' Brutal
+-- armor quests 1844 to 1847 stood there for every class) a class quest of another class: the route leaves its steps out
+function ns.OtherClassQuest(q)
+  local a = ns.QD()
+  local g = q and a and a.GetQuest and a.GetQuest(q)
+  if not (type(g) == "table" and type(g.classes) == "table" and #g.classes > 0) then return false end
+  local _, _, classID = UnitClass("player")
+  if not classID then return false end
+  for _, c in ipairs(g.classes) do if c == classID then return false end end
+  return true
 end
 
 function ns.FitIn(q)

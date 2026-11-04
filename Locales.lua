@@ -2,6 +2,8 @@ local _, ns = ...
 -- (31.10.2026, DONCORE_PLAN.md) the shared Style kit from DonCore (Libs\DonCore\Style.lua) instead of an own copy;
 -- Locales.lua is the first own file. Leveldon changes nothing in the kit, so it takes the shared one like Vitaldon.
 ns.Style = LibStub("DonCore-1.0"):Get("Style", 3)
+-- (02.11.2026, StyleKit 2 step 4) DonCore's blocks of the Don style (Kit minor 5: FocusCard, Menu, Divider, Hint, ...)
+ns.Kit = LibStub("DonCore-1.0"):Get("Kit", 7)
 
 ---------------------------------------------------------------------------
 -- (12.10., Daniel: "set to German, a lot is still in English") Leveldon's texts in the client's language.
@@ -98,6 +100,7 @@ local deDE = {
   ["Leveldon: needed later for \"%s\""] = "Leveldon: später gebraucht für „%s“",
   ["Leveldon: %d needed later for \"%s\""] = "Leveldon: %d Stück später gebraucht für „%s“",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon: Teilen %s (gesendet %d, empfangen %d Fakten, %d gespeichert). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon: Wege %s; zurückgehalten %d (Kampf oder Chatsperre), abgelehnt %d%s; Rufen %s", -- (04.11.2026, Era-Test)
   ["Keep killing %s until the %s drops: it starts a quest chain worth the time"] = "%s weiter töten, bis %s fällt: damit startet eine Questreihe, die sich lohnt",
   ["Buy %s from %s%s"] = "%s bei %s kaufen%s",
   ["  (keep it: you learn %s on the way)"] = "  (behalten: du lernst %s unterwegs)",
@@ -322,7 +325,7 @@ local deDE = {
   ["Quest giver not there, route makes no sense, or a remark: it goes into your recording."] = "Questgeber nicht da, Route ergibt keinen Sinn oder eine Anmerkung: Es kommt in deine Aufzeichnung.",
   ["Your recordings and reports as text to copy, for a bug report."] = "Deine Aufzeichnungen und Meldungen als Text zum Kopieren, für einen Fehlerbericht.",
   ["The route goes on with the next step. Right-click a step for more."] = "Die Route geht mit dem nächsten Schritt weiter. Rechtsklick auf einen Schritt für mehr.",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: Das Optionsfenster braucht Questdon 1.3.9 oder neuer. Bis dahin: /lvd-Befehle.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: Das Optionsfenster konnte nicht geladen werden. Bis dahin: /lvd-Befehle.",
   ["/lvd: show or hide the window\n/lvd options: this window\n/lvd next, /lvd back: a step on or back\n/lvd report: report this step\n/lvd profs: professions\n/lvd line [name]: the start area of your route\n/lvd dungeons on|off, /lvd solo\n/lvd reset: start the route again from your level"] = "/lvd: Fenster zeigen oder verbergen\n/lvd options: dieses Fenster\n/lvd next, /lvd back: einen Schritt vor oder zurück\n/lvd report: diesen Schritt melden\n/lvd profs: Berufe\n/lvd line [name]: Startgebiet deiner Route\n/lvd dungeons on|off, /lvd solo\n/lvd reset: Route ab deiner Stufe neu starten",
   -- (21.10.) scrollable step list: the area block and the slider (StepList.lua)
   ["Also here"] = "Gleich hier",
@@ -390,7 +393,29 @@ local deDE = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: die Pfeil-Option braucht Questdon 1.3.11 oder neuer.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: diese Option braucht Questdon.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: Das Optionsfenster kommt mit Questdon. Ohne Questdon: /lvd-Befehle.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "etwa %d Gegner",
+  ["Step %d"] = "Schritt %d",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "Klick: die Quest  ·  Shift-Klick: lesen  ·  Rechtsklick: mehr",
+  ["Right-click: more"] = "Rechtsklick: mehr",
+  ["Drag: width and height of the window."] = "Ziehen: Breite und Höhe des Fensters.",
+  ["Options > Window: speedrun line"] = "Optionen > Fenster: Speedrun-Zeile",
+  ["%s ahead"] = "%s voraus",
+  ["%s behind"] = "%s hinten",
+  ["Plan: level %.1f now"] = "Plan: jetzt Stufe %.1f",
+  ["Plan %s"] = "Plan %s",
+  ["Level %d to %d"] = "Stufe %d bis %d",
+  ["XP bar with the plan"] = "XP-Balken mit dem Plan",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "Unter dem Kapitel: deine Erfahrung in dieser Stufe, mit einer goldenen Marke, wo dich der Plan jetzt sieht.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "Eine schmale Zeile oben: deine Zeit auf dieser Route, vor (grün) oder hinter (rot) dem Plan, wann die nächste Stufe kommt, deine letzten Stufenaufstiege als kleine Säulen.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "Übernehmen",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Strg+A, Strg+C: kopieren, dann in einen Kommentar einfügen.",
+  ["Select all"] = "Alles markieren",
+  ["Close"] = "Schließen",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Questdons Questliste unter dem Fenster",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "Questdons Questliste hängt unter Leveldons Fenster und wandert mit. Aus: du platzierst sie selbst.",
 }
 
 
@@ -718,12 +743,13 @@ OTHER.frFR = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon : la monte coûte %s, il vous manque encore %s. L'itinéraire continue à pied ; Leveldon vous prévient quand vous l'aurez.",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon : itinéraire relancé depuis votre niveau.",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon : partage %s (envoyés %d, reçus %d faits, %d conservés). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon : canaux %s ; retenus %d (combat ou blocage du chat), refusés %d%s ; crier %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon : rappel du sac de couchage ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon : solo ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon : marqueurs de cible ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon : taille du texte %d %% (Ctrl + molette au-dessus de la barre de titre, /lvd text 1.3).",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon : pour les marques au-dessus des PNJ, activez les barres de nom des PNJ amicaux (options de l'interface, Noms).",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon : la fenêtre d'options nécessite Questdon 1.3.9 ou plus récent. D'ici là : commandes /lvd.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon : impossible de charger la fenêtre d'options. D'ici là : commandes /lvd.",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon : enregistrement en cours %s. %d sessions, %d événements, %d points de trajet, %d signalements conservés (/lvd rec on|off).",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon : vous êtes en avance sur l'itinéraire ; il continue à \"%s\".",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon : vous avez maintenant les %s nécessaires pour la monte : allez voir l'instructeur d'équitation.",
@@ -755,7 +781,29 @@ OTHER.frFR = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon : l'option de flèche nécessite Questdon 1.3.11 ou plus récent.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon : cette option nécessite Questdon.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon : la fenêtre d'options vient avec Questdon. Sans lui : commandes /lvd.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "environ %d monstres",
+  ["Step %d"] = "Étape %d",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "Clic : la quête  ·  Maj-clic : la lire  ·  Clic droit : plus",
+  ["Right-click: more"] = "Clic droit : plus",
+  ["Drag: width and height of the window."] = "Glisser : largeur et hauteur de la fenêtre.",
+  ["Options > Window: speedrun line"] = "Options > Fenêtre : ligne speedrun",
+  ["%s ahead"] = "%s d'avance",
+  ["%s behind"] = "%s de retard",
+  ["Plan: level %.1f now"] = "Plan : niveau %.1f maintenant",
+  ["Plan %s"] = "Plan %s",
+  ["Level %d to %d"] = "Niveau %d à %d",
+  ["XP bar with the plan"] = "Barre d'XP avec le plan",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "Sous le chapitre : ton expérience dans ce niveau, avec une marque dorée là où le plan te place maintenant.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "Une fine ligne en haut : ton temps sur cette route, en avance (vert) ou en retard (rouge) sur le plan, quand vient le prochain niveau, tes derniers niveaux en petites colonnes.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "Valider",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A, Ctrl+C : copie-le, puis colle-le dans un commentaire.",
+  ["Select all"] = "Tout sélectionner",
+  ["Close"] = "Fermer",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Liste de quêtes de Questdon sous la fenêtre",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "La liste de quêtes de Questdon se place sous la fenêtre de Leveldon et la suit. Désactivé : tu la places toi-même.",
 }
 OTHER.esES = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples dan un Thunder Applejack: guárdalo para Sergeant De Vries en Westbrook Garrison, en el edificio de la izquierda; inicia An Apple Treat)",
@@ -1077,12 +1125,13 @@ OTHER.esES = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon: la equitación cuesta %s, aún te faltan %s. La ruta sigue a pie; Leveldon te avisa cuando lo tengas.",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon: ruta reiniciada desde tu nivel.",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon: compartir %s (enviados %d, recibidos %d datos, %d guardados). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon: vías %s; retenidos %d (combate o bloqueo del chat), rechazados %d%s; gritar %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon: aviso del saco de dormir ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon: en solitario ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon: marcas de objetivo ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon: tamaño del texto %d %% (Ctrl + rueda del ratón sobre la barra de título, /lvd text 1.3).",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon: para las marcas sobre los PNJ activa las placas de nombre de los PNJ amistosos (opciones de interfaz, Nombres).",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: la ventana de opciones necesita Questdon 1.3.9 o superior. Hasta entonces: comandos /lvd.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: no se pudo cargar la ventana de opciones. Hasta entonces: comandos /lvd.",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon: grabando %s. %d sesiones, %d eventos, %d puntos de recorrido, %d informes guardados (/lvd rec on|off).",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon: vas por delante en la ruta; continúa en \"%s\".",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon: ya tienes los %s para la equitación: visita al instructor de equitación.",
@@ -1114,7 +1163,29 @@ OTHER.esES = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: la opción de la flecha necesita Questdon 1.3.11 o posterior.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: esta opción necesita Questdon.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: la ventana de opciones viene con Questdon. Sin él: comandos /lvd.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "unos %d enemigos",
+  ["Step %d"] = "Paso %d",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "Clic: la misión  ·  Mayús-clic: leerla  ·  Clic derecho: más",
+  ["Right-click: more"] = "Clic derecho: más",
+  ["Drag: width and height of the window."] = "Arrastrar: ancho y alto de la ventana.",
+  ["Options > Window: speedrun line"] = "Opciones > Ventana: línea de speedrun",
+  ["%s ahead"] = "%s por delante",
+  ["%s behind"] = "%s por detrás",
+  ["Plan: level %.1f now"] = "Plan: nivel %.1f ahora",
+  ["Plan %s"] = "Plan %s",
+  ["Level %d to %d"] = "Nivel %d a %d",
+  ["XP bar with the plan"] = "Barra de PX con el plan",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "Bajo el capítulo: tu experiencia en este nivel, con una marca dorada donde el plan te sitúa ahora.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "Una línea fina arriba: tu tiempo en esta ruta, por delante (verde) o por detrás (rojo) del plan, cuándo llega el próximo nivel, tus últimas subidas como columnas pequeñas.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "Aceptar",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A, Ctrl+C: cópialo y pégalo en un comentario.",
+  ["Select all"] = "Seleccionar todo",
+  ["Close"] = "Cerrar",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Lista de misiones de Questdon bajo la ventana",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "La lista de misiones de Questdon cuelga bajo la ventana de Leveldon y se mueve con ella. Desactivado: la colocas tú.",
 }
 OTHER.esMX = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples dan un Thunder Applejack: guárdalo para Sergeant De Vries en Westbrook Garrison, en el edificio de la izquierda; inicia An Apple Treat)",
@@ -1436,12 +1507,13 @@ OTHER.esMX = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon: la equitación cuesta %s, aún te faltan %s. La ruta sigue a pie; Leveldon te avisa cuando lo tengas.",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon: ruta reiniciada desde tu nivel.",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon: compartir %s (enviados %d, recibidos %d datos, %d guardados). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon: vías %s; retenidos %d (combate o bloqueo del chat), rechazados %d%s; gritar %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon: aviso del saco de dormir ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon: en solitario ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon: marcas de objetivo ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon: tamaño del texto %d %% (Ctrl + rueda del mouse sobre la barra de título, /lvd text 1.3).",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon: para las marcas sobre los PNJ activa las placas de nombre de los PNJ amistosos (opciones de interfaz, Nombres).",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: la ventana de opciones necesita Questdon 1.3.9 o superior. Hasta entonces: comandos /lvd.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: no se pudo cargar la ventana de opciones. Hasta entonces: comandos /lvd.",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon: grabando %s. %d sesiones, %d eventos, %d puntos de recorrido, %d reportes guardados (/lvd rec on|off).",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon: vas por delante en la ruta; continúa en \"%s\".",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon: ya tienes los %s para la equitación: visita al instructor de equitación.",
@@ -1473,7 +1545,29 @@ OTHER.esMX = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: la opción de la flecha necesita Questdon 1.3.11 o posterior.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: esta opción necesita Questdon.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: la ventana de opciones viene con Questdon. Sin él: comandos /lvd.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "unos %d enemigos",
+  ["Step %d"] = "Paso %d",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "Clic: la misión  ·  Mayús-clic: leerla  ·  Clic derecho: más",
+  ["Right-click: more"] = "Clic derecho: más",
+  ["Drag: width and height of the window."] = "Arrastrar: ancho y alto de la ventana.",
+  ["Options > Window: speedrun line"] = "Opciones > Ventana: línea de speedrun",
+  ["%s ahead"] = "%s por delante",
+  ["%s behind"] = "%s por detrás",
+  ["Plan: level %.1f now"] = "Plan: nivel %.1f ahora",
+  ["Plan %s"] = "Plan %s",
+  ["Level %d to %d"] = "Nivel %d a %d",
+  ["XP bar with the plan"] = "Barra de PX con el plan",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "Bajo el capítulo: tu experiencia en este nivel, con una marca dorada donde el plan te sitúa ahora.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "Una línea fina arriba: tu tiempo en esta ruta, por delante (verde) o por detrás (rojo) del plan, cuándo llega el próximo nivel, tus últimas subidas como columnas pequeñas.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "Aceptar",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A, Ctrl+C: cópialo y pégalo en un comentario.",
+  ["Select all"] = "Seleccionar todo",
+  ["Close"] = "Cerrar",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Lista de misiones de Questdon bajo la ventana",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "La lista de misiones de Questdon cuelga bajo la ventana de Leveldon y se mueve con ella. Desactivado: la colocas tú.",
 }
 OTHER.ptBR = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples fazem um Thunder Applejack: guarde-o para Sergeant De Vries em Westbrook Garrison, no prédio à esquerda; ele inicia An Apple Treat)",
@@ -1795,12 +1889,13 @@ OTHER.ptBR = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon: a equitação custa %s, você ainda precisa de %s. A rota continua a pé; o Leveldon avisa quando você tiver.",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon: rota reiniciada a partir do seu nível.",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon: compartilhamento %s (enviados %d, recebidos %d dados, %d mantidos). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon: canais %s; retidos %d (combate ou bloqueio do chat), recusados %d%s; gritar %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon: lembrete do saco de dormir ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon: solo ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon: marcas de alvo ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon: tamanho do texto %d %% (Ctrl + roda do mouse sobre a barra de título, /lvd text 1.3).",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon: para as marcas sobre os NPCs, ative as placas de identificação de NPCs amigáveis (opções de interface, Nomes).",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: a janela de opções precisa do Questdon 1.3.9 ou mais novo. Até lá: comandos /lvd.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: não foi possível carregar a janela de opções. Até lá: comandos /lvd.",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon: gravando %s. %d sessões, %d eventos, %d pontos de trajeto, %d relatórios mantidos (/lvd rec on|off).",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon: você está à frente na rota; ela continua em \"%s\".",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon: você já tem os %s para a equitação: visite o instrutor de equitação.",
@@ -1832,7 +1927,29 @@ OTHER.ptBR = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: a opção da seta precisa do Questdon 1.3.11 ou mais novo.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: esta opção precisa do Questdon.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: a janela de opções vem com o Questdon. Sem ele: comandos /lvd.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "cerca de %d inimigos",
+  ["Step %d"] = "Passo %d",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "Clique: a missão  ·  Shift-clique: ler  ·  Clique direito: mais",
+  ["Right-click: more"] = "Clique direito: mais",
+  ["Drag: width and height of the window."] = "Arrastar: largura e altura da janela.",
+  ["Options > Window: speedrun line"] = "Opções > Janela: linha de speedrun",
+  ["%s ahead"] = "%s à frente",
+  ["%s behind"] = "%s atrás",
+  ["Plan: level %.1f now"] = "Plano: nível %.1f agora",
+  ["Plan %s"] = "Plano %s",
+  ["Level %d to %d"] = "Nível %d a %d",
+  ["XP bar with the plan"] = "Barra de XP com o plano",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "Sob o capítulo: sua experiência neste nível, com uma marca dourada onde o plano coloca você agora.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "Uma linha fina no topo: seu tempo nesta rota, à frente (verde) ou atrás (vermelho) do plano, quando vem o próximo nível, suas últimas subidas como pequenas colunas.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "Aplicar",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A, Ctrl+C: copie e cole em um comentário.",
+  ["Select all"] = "Selecionar tudo",
+  ["Close"] = "Fechar",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Lista de missões do Questdon sob a janela",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "A lista de missões do Questdon fica sob a janela do Leveldon e acompanha. Desligado: você a posiciona.",
 }
 OTHER.ruRU = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4 Shiny Red Apples превращаются в Thunder Applejack: сохраните его для Sergeant De Vries в Westbrook Garrison, в здании слева; он начинает An Apple Treat)",
@@ -2154,12 +2271,13 @@ OTHER.ruRU = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon: верховая езда стоит %s, вам еще нужно %s. Маршрут идет дальше пешком; Leveldon сообщит, когда у вас это будет.",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon: маршрут запущен заново с вашего уровня.",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon: обмен %s (отправлено %d, получено %d фактов, сохранено %d). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon: каналы %s; задержано %d (бой или блокировка чата), отклонено %d%s; крик %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon: напоминание о спальном мешке ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon: соло ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon: метки целей ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon: размер текста %d %% (Ctrl + колесико мыши над строкой заголовка, /lvd text 1.3).",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon: для меток над NPC включите индикаторы здоровья дружественных NPC (параметры интерфейса, Имена).",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: для окна параметров нужен Questdon 1.3.9 или новее. А пока: команды /lvd.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: не удалось загрузить окно параметров. А пока: команды /lvd.",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon: запись %s. Сессий: %d, событий: %d, точек пути: %d, отчетов сохранено: %d (/lvd rec on|off).",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon: вы впереди маршрута; он продолжается на \"%s\".",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon: у вас теперь есть %s на верховую езду: зайдите к учителю верховой езды.",
@@ -2191,7 +2309,29 @@ OTHER.ruRU = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: для параметра стрелки нужен Questdon 1.3.11 или новее.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: для этого параметра нужен Questdon.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: окно настроек входит в Questdon. Без него: команды /lvd.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "около %d противников",
+  ["Step %d"] = "Шаг %d",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "Щелчок: задание  ·  Shift-щелчок: прочитать  ·  Правый щелчок: ещё",
+  ["Right-click: more"] = "Правый щелчок: ещё",
+  ["Drag: width and height of the window."] = "Перетаскивание: ширина и высота окна.",
+  ["Options > Window: speedrun line"] = "Настройки > Окно: строка спидрана",
+  ["%s ahead"] = "%s впереди",
+  ["%s behind"] = "%s позади",
+  ["Plan: level %.1f now"] = "План: сейчас уровень %.1f",
+  ["Plan %s"] = "План %s",
+  ["Level %d to %d"] = "Уровень %d–%d",
+  ["XP bar with the plan"] = "Полоса опыта с планом",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "Под главой: твой опыт на этом уровне с золотой меткой там, где ты должен быть по плану.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "Тонкая строка сверху: твоё время на маршруте, впереди (зелёный) или позади (красный) плана, когда будет следующий уровень, последние повышения уровня маленькими столбиками.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "Применить",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A, Ctrl+C: скопируй и вставь в комментарий.",
+  ["Select all"] = "Выделить всё",
+  ["Close"] = "Закрыть",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Список заданий Questdon под окном",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "Список заданий Questdon висит под окном Leveldon и двигается вместе с ним. Выкл.: ты ставишь его сам.",
 }
 OTHER.koKR = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (Shiny Red Apples 4개로 Thunder Applejack을 만듭니다: Westbrook Garrison 왼쪽 건물의 Sergeant De Vries에게 줄 수 있게 보관하세요. An Apple Treat 퀘스트가 시작됩니다)",
@@ -2513,12 +2653,13 @@ OTHER.koKR = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon: 기마술 비용 %s, 아직 필요한 금액: %s. 경로는 걸어서 계속됩니다. 마련되면 Leveldon이 알려 드립니다.",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon: 현재 레벨부터 경로를 다시 시작했습니다.",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon: 공유 %s (보냄 %d, 받음 %d건, %d건 보관). /lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon: 경로 %s; 보류 %d (전투 또는 대화 잠금), 거부 %d%s; 외치기 %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon: 침낭 알림 ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon: 솔로 ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon: 대상 표시 ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon: 글자 크기 %d %% (제목 표시줄 위에서 Ctrl + 마우스 휠, /lvd text 1.3).",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon: NPC 위 표시를 보려면 우호적인 NPC의 이름표를 켜세요 (인터페이스 옵션, 이름).",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: 설정 창에는 Questdon 1.3.9 이상이 필요합니다. 그때까지: /lvd 명령어.",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon: 설정 창을 불러오지 못했습니다. 그때까지: /lvd 명령어.",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon: 기록 %s. 세션 %d개, 이벤트 %d개, 이동 지점 %d개, 신고 %d개 보관 (/lvd rec on|off).",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon: 경로보다 앞서 있습니다. \"%s\"에서 계속됩니다.",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon: 기마술에 필요한 금액을 모았습니다 (%s): 기마술 훈련사를 방문하세요.",
@@ -2550,7 +2691,29 @@ OTHER.koKR = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon: 화살표 옵션에는 Questdon 1.3.11 이상이 필요합니다.",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon: 이 옵션에는 Questdon이 필요합니다.",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon: 옵션 창은 Questdon과 함께 제공됩니다. 없으면: /lvd 명령어.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "약 %d마리",
+  ["Step %d"] = "%d단계",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "클릭: 퀘스트  ·  Shift-클릭: 읽기  ·  오른쪽 클릭: 더 보기",
+  ["Right-click: more"] = "오른쪽 클릭: 더 보기",
+  ["Drag: width and height of the window."] = "끌기: 창의 너비와 높이.",
+  ["Options > Window: speedrun line"] = "옵션 > 창: 스피드런 줄",
+  ["%s ahead"] = "%s 앞섬",
+  ["%s behind"] = "%s 뒤처짐",
+  ["Plan: level %.1f now"] = "계획: 지금 %.1f레벨",
+  ["Plan %s"] = "계획 %s",
+  ["Level %d to %d"] = "%d~%d레벨",
+  ["XP bar with the plan"] = "계획이 표시된 경험치 바",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "챕터 아래: 이 레벨의 경험치와 지금 계획상 위치를 나타내는 금색 표시.",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "위쪽의 얇은 줄: 이 경로에서의 시간, 계획보다 앞섬(녹색) 또는 뒤처짐(빨간색), 다음 레벨까지 남은 시간, 최근 레벨업을 작은 막대로.",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "적용",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A, Ctrl+C: 복사한 뒤 댓글에 붙여 넣으세요.",
+  ["Select all"] = "모두 선택",
+  ["Close"] = "닫기",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "창 아래에 Questdon 퀘스트 목록",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "Questdon 퀘스트 목록이 Leveldon 창 아래에 붙어 함께 움직입니다. 끄면 직접 배치합니다.",
 }
 OTHER.zhTW = {
   ["  (4 Shiny Red Apples make a Thunder Applejack: keep it for Sergeant De Vries in Westbrook Garrison, in the building on the left; it starts An Apple Treat)"] = "  (4個 Shiny Red Apples 可以做成 Thunder Applejack：留著給 Westbrook Garrison 左邊建築裡的 Sergeant De Vries，會開始 An Apple Treat)",
@@ -2872,12 +3035,13 @@ OTHER.zhTW = {
   ["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."] = "|cff3fa9f5Level|rdon：騎術要 %s，你還差 %s。路線先以步行繼續；等你湊齊了 Leveldon 會通知你。",
   ["|cff3fa9f5Level|rdon: route started again from your level."] = "|cff3fa9f5Level|rdon：路線已從你目前的等級重新開始。",
   ["|cff3fa9f5Level|rdon: sharing %s (sent %d, received %d facts, %d kept). /lvd share on|off"] = "|cff3fa9f5Level|rdon：分享 %s (已傳送 %d 筆，已接收 %d 筆事實，保留 %d 筆)。/lvd share on|off",
+  ["|cff3fa9f5Level|rdon: ways %s; held back %d (fight or chat lockdown), refused %d%s; yell %s"] = "|cff3fa9f5Level|rdon：途徑 %s；暫緩 %d (戰鬥或聊天鎖定)，被拒 %d%s；大喊 %s", -- (04.11.2026, Era-Test)
   ["|cff3fa9f5Level|rdon: sleeping bag reminder "] = "|cff3fa9f5Level|rdon：睡袋提醒 ",
   ["|cff3fa9f5Level|rdon: solo "] = "|cff3fa9f5Level|rdon：單人 ",
   ["|cff3fa9f5Level|rdon: target markers "] = "|cff3fa9f5Level|rdon：目標標記 ",
   ["|cff3fa9f5Level|rdon: text size %d %% (Ctrl + mouse wheel over the title bar, /lvd text 1.3)."] = "|cff3fa9f5Level|rdon：文字大小 %d %% (在標題列上按住 Ctrl + 滑鼠滾輪，/lvd text 1.3)。",
   ["|cff3fa9f5Level|rdon: the marks over NPCs need the nameplates of friendly NPCs (interface options, Names)."] = "|cff3fa9f5Level|rdon：NPC 上方的標記需要開啟友方 NPC 的姓名板 (介面選項，名稱)。",
-  ["|cff3fa9f5Level|rdon: the options window needs Questdon 1.3.9 or newer. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon：選項視窗需要 Questdon 1.3.9 或更新版本。在那之前請用：/lvd 指令。",
+  ["|cff3fa9f5Level|rdon: the options window could not be loaded. Until then: /lvd commands."] = "|cff3fa9f5Level|rdon：無法載入選項視窗。在那之前請用：/lvd 指令。",
   ["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."] = "|cff3fa9f5Level|rdon：正在記錄 %s。%d 個工作階段、%d 個事件、%d 個行走點、保留 %d 筆回報 (/lvd rec on|off)。",
   ["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."] = "|cff3fa9f5Level|rdon：你領先路線；會從「%s」繼續。",
   ["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."] = "|cff3fa9f5Level|rdon：你現在湊齊了學騎術的 %s：去找騎術訓練師吧。",
@@ -2909,8 +3073,52 @@ OTHER.zhTW = {
   ["|cff3fa9f5Level|rdon: the arrow option needs Questdon 1.3.11 or newer."] = "|cff3fa9f5Level|rdon:箭頭選項需要 Questdon 1.3.11 或更新版本。",
   -- (31.10.2026, Kritikrunde) Leveldon without Questdon (Options.lua)
   ["|cff3fa9f5Level|rdon: this option needs Questdon."] = "|cff3fa9f5Level|rdon:此選項需要 Questdon。",
-  ["|cff3fa9f5Level|rdon: the options window comes with Questdon. Without it: /lvd commands."] = "|cff3fa9f5Level|rdon:選項視窗隨 Questdon 提供。沒有它時:/lvd 指令。",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["about %d mobs"] = "約 %d 隻怪物",
+  ["Step %d"] = "第 %d 步",
+  ["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] = "點擊：任務  ·  Shift-點擊：閱讀  ·  右鍵：更多",
+  ["Right-click: more"] = "右鍵：更多",
+  ["Drag: width and height of the window."] = "拖曳：視窗的寬度與高度。",
+  ["Options > Window: speedrun line"] = "選項 > 視窗：速通列",
+  ["%s ahead"] = "領先 %s",
+  ["%s behind"] = "落後 %s",
+  ["Plan: level %.1f now"] = "計畫：現在等級 %.1f",
+  ["Plan %s"] = "計畫 %s",
+  ["Level %d to %d"] = "等級 %d 到 %d",
+  ["XP bar with the plan"] = "附計畫的經驗條",
+  ["Under the chapter: your experience in this level, with a gold mark where the plan has you now."] = "章節下方：本等級的經驗值，金色標記表示計畫中你現在應到的位置。",
+  ["A thin line on top: your time on this route, ahead (green) or behind (red) of the plan, when the next level comes, your last level-ups as small columns."] = "頂部細列：你在此路線上的時間、領先（綠）或落後（紅）計畫、下一級何時到來，最近的升級以小柱顯示。",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Take it"] = "套用",
+  ["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."] = "Ctrl+A、Ctrl+C：複製後貼到留言中。",
+  ["Select all"] = "全選",
+  ["Close"] = "關閉",
+  -- (02.11.2026, StyleKit 2 step 4) the window in the Don style
+  ["Questdon's quest list under the window"] = "Questdon 任務清單貼在視窗下方",
+  ["Questdon's quest list hangs under Leveldon's window and moves with it. Off: you place it yourself."] = "Questdon 任務清單貼在 Leveldon 視窗下方並跟著移動。關閉：自行擺放。",
 }
+
+-- (04.11.2026, Era-Test) the minimap button (MinimapButton.lua); the option's own words and "Hide minimap button" come
+-- from DonCore. Right click opens a small menu like Questdon's (Daniel 04.11.: "bei questdon kommt mit rechtsklick so ein
+-- menü, das hätte ich bei den anderen auch gerne"); its switches use the options' words above.
+do
+  local HINT = "Left click: show or hide the window. Right click: menu. Drag: move it around the minimap."
+  local ALL = "All options"
+  local MM = {
+    deDE = { "Linksklick: Fenster ein- oder ausblenden. Rechtsklick: Menü. Ziehen: um die Minimap verschieben.", "Alle Optionen" },
+    frFR = { "Clic gauche : afficher ou masquer la fenêtre. Clic droit : menu. Glisser : le déplacer autour de la minicarte.", "Toutes les options" },
+    esES = { "Clic izquierdo: mostrar u ocultar la ventana. Clic derecho: menú. Arrastrar: moverlo alrededor del minimapa.", "Todas las opciones" },
+    esMX = { "Clic izquierdo: mostrar u ocultar la ventana. Clic derecho: menú. Arrastrar: moverlo alrededor del minimapa.", "Todas las opciones" },
+    ptBR = { "Clique esquerdo: mostrar ou ocultar a janela. Clique direito: menu. Arrastar: movê-lo ao redor do minimapa.", "Todas as opções" },
+    ruRU = { "ЛКМ: показать или скрыть окно. ПКМ: меню. Перетаскивание: передвинуть вокруг миникарты.", "Все настройки" },
+    koKR = { "왼쪽 클릭: 창 표시/숨기기. 오른쪽 클릭: 메뉴. 끌기: 미니맵 주위로 이동.", "모든 설정" },
+    zhTW = { "左鍵：顯示或隱藏視窗。右鍵：選單。拖曳：沿小地圖移動。", "所有選項" },
+  }
+  for loc, w in pairs(MM) do
+    local t = loc == "deDE" and deDE or OTHER[loc]
+    if t then t[HINT] = w[1] t[ALL] = w[2] end
+  end
+end
 
 local T = ns.LOCALE == "deDE" and deDE or OTHER[ns.LOCALE] or {}
 ns.L = setmetatable({}, { __index = function(_, k) return T[k] or k end })

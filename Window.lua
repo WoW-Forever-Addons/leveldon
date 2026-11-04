@@ -1,59 +1,43 @@
 local _, ns = ...
 local L = ns.L
 local Style = ns.Style
+local Kit = LibStub("DonCore-1.0"):Get("Kit", 7)
 
 ---------------------------------------------------------------------------
--- (0.1.8, Daniel 12.10.: "the chapter path, the compass in the current station, the speedrun line on
--- top", in the frame of Questdon's quest book) The parts of the window Refresh (Leveldon.lua) puts
--- together:
---   Run       a thin speedrun line: time played on this route, ahead (green) or behind (red) of the
---             plan, the last level-ups as small bars, when the next level is due (button: stopwatch)
---   Banner    the chapter: a golden ring with its progress, the name, levels, step, and the XP bar
---             with a gold mark where the plan has you now
---   Line      the path: a thin line through the icons, gold behind you, grey ahead
---   Done      the last finished stations, dimmed
---   Milestone a gold diamond where the plan reaches the next level
---   Station   under the current step: its objectives as blocks, the place, and Questdon's compass
---             (QuestdonAPI.NewCompass): Questdon's own arrow then draws nothing (SetGuideCompass)
+-- (02.11.2026, StyleKit 2 step 4, docs/layout_2026-11-02/leveldon/, approved by Daniel) The window in the Don style, made of
+-- DonCore's blocks (Kit), like Questdon's quest list. Refresh (Leveldon.lua) puts it together from the top:
+--   Run    (option, off by default) 24 px: time played on this route, ahead (green) or behind (red) of the plan, when the
+--          next level is due, the last level-ups as small columns (Kit.Spark; not under 300 px)
+--   Head   the chapter: Kit.Ring with its progress, the name, "Level a to b · step n of m"; with the option an XP bar with
+--          the plan's mark (Kit.SegmentBar)
+--   Done   the last two finished steps, dimmed with a green tick (Kit.DoneRow)
+--   Card   the step you are on (Kit.FocusCard): symbol, "STEP 23 · DO · [7]", the title, the objectives with count and bar,
+--          the way, what to do along here, up to three hints; Questdon's compass on the right only with the option
+--   List   the coming steps (StepList.lua, Kit.List): it takes the rest of the window's height
+--   Foot   "Step n of m", a gold bar, the chapter's percent
+-- The window's height is the player's (the handle at the bottom right, Resize.lua): it never changes by itself, the card grows
+-- downwards and the list gets what is left (Daniel 02.11.: "Höhe frei ziehbar" instead of "number of coming steps").
 -- Opacity: Shift + mouse wheel over the title bar, down to no background and no frame.
 ---------------------------------------------------------------------------
 local W = {}
 ns.LvdWin = W
-Style.ICONS.lvdRead = Style.ICONS.lvdRead or {
-  atlas = { "Campaign-QuestLog-LoreBook", "questlog-questtypeicon-lore" }, file = "Interface\\Icons\\INV_Misc_Book_09" }
-Style.ICONS.lvdTimer = Style.ICONS.lvdTimer or {
-  atlas = { "auctionhouse-icon-clock", "Mobile-QuestIcon" }, file = "Interface\\Icons\\INV_Misc_PocketWatch_01" }
-local B = Style.BOOK or {}
-local WHITE = "Interface\\Buttons\\WHITE8x8"
-local GOLD = B.gold or { 0.86, 0.71, 0.42 }
-local GOLD_L = B.goldLight or { 0.97, 0.87, 0.60 }
-local CREAM = B.textPrimary or { 0.96, 0.92, 0.84 }
-local SECOND = B.textSecondary or { 0.80, 0.76, 0.68 }
-local HINT = B.textHint or { 0.58, 0.57, 0.66 }
-local GREEN, RED, VIOLET = { 0.40, 0.85, 0.45 }, { 0.94, 0.42, 0.37 }, { 0.58, 0.40, 0.92 }
+local C, S = Kit.C, Kit.SIZE
 local COMPASS = 54
+local RUN_H, HEAD_H, HEAD_XP_H, FOOT_H = 24, 44, 52, 24
+local NARROW = 300 -- (Daniel 02.11.) under this width: no columns in the run line, no report and read buttons up top
 
 local function DB() return LeveldonCharDB or {} end
 -- (31.10.2026, Daniel: "Leveldon standardmäßig wie Questdon mit dem separaten Pfeil, damit die Questliste cleaner ist")
 -- the compass in the current step only when switched on (true); unset or false: the separate arrow leads
 local function CompassOn() return DB().compass == true end
 local function API() return ns.QD() end
-
-local function Font(parent, size, color, justify)
-  local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  if size and fs.SetFont then pcall(function() local p = fs:GetFont() if p then fs:SetFont(p, size, "") end end) end
-  if justify and fs.SetJustifyH then fs:SetJustifyH(justify) end
-  if fs.SetWordWrap then fs:SetWordWrap(false) end
-  if type(color) == "table" and fs.SetTextColor then fs:SetTextColor(color[1], color[2], color[3], 1) end
-  return fs
-end
-local function Color(fs, c) if type(c) == "table" and fs and fs.SetTextColor then fs:SetTextColor(c[1], c[2], c[3], 1) end end
-local function Tex(parent, layer, c, a)
-  local t = parent:CreateTexture(nil, layer)
-  t:SetTexture(WHITE)
-  if type(c) == "table" then t:SetVertexColor(c[1], c[2], c[3], a or 1) end
-  return t
-end
+-- (02.11.2026, Daniel: "beides wie mockup abschaltbar, aber standard aus") the run line and the XP bar
+function W.RunOn() return DB().runLine == true end
+function W.XPOn() return DB().xpBar == true end
+function W.Plain() return DB().plain ~= false end -- (25.10.) on unless switched off
+-- (03.11.2026, Daniel: "der aktuelle step ist zu groß, zone und koordinaten weg. yards steht ja schon im pfeil von donmap")
+-- the card has no way line any more (the place stays in the tooltip and on the map)
+W.SHOW_WAY = false
 
 ---------------------------------------------------------------------------
 -- Speedrun: time on the route
@@ -160,447 +144,401 @@ local ev = ns.CreateFrame("Frame")
 ev:SetScript("OnEvent", function(_, _, level) pcall(W.LevelUp, tonumber(level)) end)
 pcall(ev.RegisterEvent, ev, "PLAYER_LEVEL_UP")
 
-local runFrame
-local function RunFrame()
-  if runFrame then return runFrame end
+---------------------------------------------------------------------------
+-- The parts: own frames, made once, handed to the panel with Style.Content on every build
+---------------------------------------------------------------------------
+local parts = {}
+W.parts = parts -- (tests)
+
+local function Part(key, h)
   local f = ns.CreateFrame("Frame", nil, UIParent)
-  f:SetSize(300, 26)
-  f.bg = Tex(f, "BACKGROUND", { 0.05, 0.06, 0.14 }, 0.55)
-  f.bg:SetAllPoints()
-  f.time = Font(f, 15, CREAM, "LEFT")
-  f.time:SetPoint("LEFT", f, "LEFT", 6, 0)
-  f.delta = Font(f, 13, GREEN, "LEFT")
-  f.delta:SetPoint("LEFT", f.time, "RIGHT", 8, 0)
-  f.next = Font(f, 10, HINT, "RIGHT")
-  f.next:SetPoint("RIGHT", f, "RIGHT", -6, 0)
-  f.bars = {}
-  f.mid = Tex(f, "BORDER", { 1, 1, 1 }, 0.15)
-  f.mid:SetHeight(1)
-  -- (12.10., Daniel: "I don't get the clock up there") what the line says, on the mouse
-  if f.EnableMouse then f:EnableMouse(true) end
-  f:SetScript("OnEnter", function(self)
-    Style.Tooltip(self, L["Speedrun line"], {
-      L["Your time on this route. It stops when you do nothing for 2 minutes."],
-      L["Green: ahead of the plan. Red: behind it."],
-      L["Bars: your last level-ups, up ahead of the plan, down behind it."],
-    }, L["/lvd run: off  ·  /lvd run reset: start again"])
-  end)
-  f:SetScript("OnLeave", function(self) Style.HideTooltip(self) end)
-  runFrame = f
+  f:SetSize(300, h)
+  f:Hide()
+  parts[key] = f
   return f
 end
 
-function W.Run(panel, steps, cur)
-  -- (17.10., Daniel: "speedrun line bei leveldon koennen wir mal weglassen") left out for now: no button, no option,
-  -- no /lvd run; the code stays for later. (12.10.: off unless switched on)
-  if true or DB().runLine ~= true or type(steps) ~= "table" or #steps == 0 then return end
+-- (Daniel 02.11.: with background and frame the parts went over the gold frame) every part stands W.INSET px inside the
+-- window's edges; Refresh hands them the width without that
+W.INSET = 2
+function W.Put(panel, f, h, opts)
+  opts = opts or {}
+  opts.inset, opts.gapBefore = false, 0
+  local holder = Style.Content(panel, f, h, opts)
+  if holder then
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", holder, "TOPLEFT", W.INSET, 0)
+    f:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -W.INSET, 0)
+  end
+  return holder
+end
+local function Put(panel, f, h)
+  W.Put(panel, f, h)
+  return h
+end
+
+---------------------------------------------------------------------------
+-- Run line
+---------------------------------------------------------------------------
+local function RunPart()
+  if parts.run then return parts.run end
+  local f = Part("run", RUN_H)
+  f.bg = Kit.Fill(f, C.panel)
+  f.line = Kit.Tex(f, "ARTWORK", C.divider)
+  f.line:SetPoint("BOTTOMLEFT") f.line:SetPoint("BOTTOMRIGHT") f.line:SetHeight(1)
+  f.clock = f:CreateTexture(nil, "ARTWORK")
+  f.clock:SetSize(12, 12)
+  f.clock:SetPoint("LEFT", f, "LEFT", 8, 0)
+  Style.SetIcon(f.clock, "timer")
+  f.time = Kit.Text(f, "sub", C.muted)
+  f.delta = Kit.Text(f, "sub", C.green)
+  f.next = Kit.Text(f, "sub", C.muted)
+  f.spark = Kit.Spark(f, { h = 12 })
+  f.spark:SetPoint("RIGHT", f, "RIGHT", -8, 0)
+  -- (12.10., Daniel: "I don't get the clock up there") what the line says, on the mouse
+  if f.EnableMouse then f:EnableMouse(true) end
+  f:SetScript("OnEnter", function(self)
+    Kit.Tooltip(self, L["Speedrun line"], {
+      L["Your time on this route. It stops when you do nothing for 2 minutes."],
+      L["Green: ahead of the plan. Red: behind it."],
+      L["Bars: your last level-ups, up ahead of the plan, down behind it."],
+    }, L["Options > Window: speedrun line"])
+  end)
+  f:SetScript("OnLeave", function(self) Kit.HideTooltip(self) end)
+  return f
+end
+
+-- returns the height it took (0: off, or the route has no planned times)
+function W.Run(panel, steps, cur, width)
+  if not W.RunOn() or type(steps) ~= "table" or #steps == 0 then return 0 end
   -- routes built before 12.10. have no planned times: no line
   if W._timed ~= steps then
     W._timed, W._hasT = steps, false
     for _, s in ipairs(steps) do if type(s.t) == "number" then W._hasT = true break end end
   end
-  if not W._hasT then return end
+  if not W._hasT then return 0 end
   local r = StartRun(steps, cur)
-  local f = RunFrame()
+  local f = RunPart()
+  width = width or 300
   local d = r.t - W.PlanNow(steps, cur)
   f.time:SetText(Clock(r.t))
-  f.delta:SetText(Delta(d))
-  Color(f.delta, d <= 0 and GREEN or RED)
+  f.delta:SetText((d <= 0 and L["%s ahead"] or L["%s behind"]):format(Delta(d):sub(2)))
+  Kit.TextColor(f.delta, d <= 0 and C.green or C.red)
   local lv = UnitLevel and UnitLevel("player") or 1
   local plan = W.PlanLevel(steps, lv + 1)
   -- (12.10.) how long the plan needs from here to the next level, not a time on the clock
   local left = plan and (plan - W.PlanNow(steps, cur))
   f.next:SetText(not left and "" or left < 60 and L["Level %d: almost there"]:format(lv + 1)
     or L["Level %d in about %d min"]:format(lv + 1, math.floor(left / 60 + 0.5)))
-  -- the last level-ups: small bars, up = ahead of the plan, down = behind
-  for _, b in ipairs(f.bars) do b:Hide() end
-  local splits = r.splits or {}
-  local maxd = 60
-  for _, s in ipairs(splits) do maxd = math.max(maxd, math.abs(s.d or 0)) end
-  local x0 = 150
-  f.mid:ClearAllPoints()
-  f.mid:SetPoint("LEFT", f, "LEFT", x0, 0)
-  f.mid:SetWidth(math.max(1, #splits * 6))
-  for i, s in ipairs(splits) do
-    local b = f.bars[i]
-    if not b then b = Tex(f, "ARTWORK", GREEN, 1) f.bars[i] = b end
-    local h = math.max(2, math.floor(9 * math.abs(s.d or 0) / maxd + 0.5))
-    local ahead = (s.d or 0) <= 0
-    b:SetVertexColor((ahead and GREEN or RED)[1], (ahead and GREEN or RED)[2], (ahead and GREEN or RED)[3], 1)
-    b:ClearAllPoints()
-    b:SetSize(4, h)
-    if ahead then b:SetPoint("BOTTOMLEFT", f, "LEFT", x0 + (i - 1) * 6, 0) else b:SetPoint("TOPLEFT", f, "LEFT", x0 + (i - 1) * 6, 0) end
-    b:Show()
+  -- the last level-ups as columns: green ahead of the plan, red behind it
+  local vals, cols = W._sparkV or {}, W._sparkC or {}
+  W._sparkV, W._sparkC = vals, cols
+  for k = #vals, 1, -1 do vals[k], cols[k] = nil, nil end
+  if width >= NARROW then
+    for i, s in ipairs(r.splits or {}) do
+      vals[i] = math.max(1, math.abs(s.d or 0))
+      cols[i] = (s.d or 0) <= 0 and C.green or C.red
+    end
   end
-  Style.Content(panel, f, 26, { inset = false })
+  f.spark:SetValues(vals, cols)
+  if #vals > 0 then f.spark:Show() else f.spark:Hide() end
+  local x = 24
+  f.time:ClearAllPoints() f.time:SetPoint("LEFT", f, "LEFT", x, 0)
+  Kit.Fit(f.time, 60)
+  x = x + math.min(Kit.TextWidth(f.time), 60) + 6
+  f.delta:ClearAllPoints() f.delta:SetPoint("LEFT", f, "LEFT", x, 0)
+  local room = width - x - 8 - (#vals > 0 and f.spark:Width() + 8 or 0)
+  Kit.Fit(f.delta, math.max(20, math.min(Kit.TextWidth(f.delta), room)))
+  x = x + math.min(Kit.TextWidth(f.delta), room) + 6
+  f.next:ClearAllPoints() f.next:SetPoint("LEFT", f, "LEFT", x, 0)
+  Kit.Fit(f.next, math.max(1, width - x - 8 - (#vals > 0 and f.spark:Width() + 8 or 0)))
+  if width - x < 30 then f.next:Hide() else f.next:Show() end
+  return Put(panel, f, RUN_H)
 end
 
 ---------------------------------------------------------------------------
--- Banner: ring, chapter, step, XP with the plan's mark
+-- Head: the chapter
 ---------------------------------------------------------------------------
-local banner
-local function BannerFrame()
-  if banner then return banner end
-  local f = ns.CreateFrame("Frame", nil, UIParent)
-  f:SetSize(300, 46)
-  f.bg = Tex(f, "BACKGROUND", { 0.20, 0.15, 0.35 }, 0.35)
-  f.bg:SetAllPoints()
-  f.ring = f:CreateTexture(nil, "ARTWORK")
-  f.ring:SetSize(38, 38)
-  f.ring:SetPoint("LEFT", f, "LEFT", 6, 0)
-  f.ring:SetTexture("Interface\\AddOns\\Questdon\\Media\\BookRing")
-  f.pct = Font(f, 10, GOLD_L, "CENTER")
-  f.pct:SetPoint("CENTER", f.ring, "CENTER", 0, 0)
-  f.title = Font(f, 14, GOLD_L, "LEFT")
-  f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 52, -6)
-  f.sub = Font(f, 10, SECOND, "LEFT")
-  f.sub:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -2)
-  f.xpBack = Tex(f, "BORDER", { 1, 1, 1 }, 0.10)
-  f.xpBack:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 52, 6)
-  f.xpBack:SetHeight(4)
-  f.xp = Tex(f, "ARTWORK", VIOLET, 1)
-  f.xp:SetPoint("TOPLEFT", f.xpBack, "TOPLEFT", 0, 0)
-  f.xp:SetHeight(4)
-  f.mark = Tex(f, "OVERLAY", GOLD_L, 1)
-  f.mark:SetSize(2, 10)
-  banner = f
+local function HeadPart()
+  if parts.head then return parts.head end
+  local f = Part("head", HEAD_H)
+  f.bg = Kit.Fill(f, C.panel)
+  f.line = Kit.Tex(f, "ARTWORK", C.divider)
+  f.line:SetPoint("BOTTOMLEFT") f.line:SetPoint("BOTTOMRIGHT") f.line:SetHeight(1)
+  -- (Daniel 02.11.: "der kreis mit % sollte durchgängig sein") a closed ring, not single dots
+  f.ring = Kit.Ring(f, 36, { solid = true })
+  f.ring:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -4)
+  f.title = Kit.Text(f, "title", C.hero)
+  f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 52, -7)
+  f.sub = Kit.Text(f, "sub", C.muted)
+  f.sub:SetPoint("TOPLEFT", f, "TOPLEFT", 52, -24)
+  f.bar = Kit.SegmentBar(f, { ticks = 4 })
+  f.bar:SetPoint("TOPLEFT", f, "TOPLEFT", 52, -40)
+  if f.EnableMouse then f:EnableMouse(true) end
+  f:SetScript("OnEnter", function(self)
+    local lines = {}
+    if Kit.FullText(self.title) then lines[#lines + 1] = Kit.FullText(self.title) end
+    lines[#lines + 1] = self.sub:GetText()
+    if self.xpTip then lines[#lines + 1] = self.xpTip end
+    Kit.Tooltip(self, self.name, lines)
+  end)
+  f:SetScript("OnLeave", function(self) Kit.HideTooltip(self) end)
   return f
 end
 
-function W.Banner(panel, title, lo, hi, step, total, progress, planEl, width)
-  local f = BannerFrame()
-  f.pct:SetText(("%d%%"):format(math.floor((progress or 0) * 100 + 0.5)))
-  f.title:SetText(title or "")
-  f.sub:SetText(L["Level %d to %d  ·  step %d of %d"]:format(lo or 0, hi or 0, step or 0, total or 0))
-  local w = math.max(60, (width or 300) - 52 - 10)
-  f.title:SetWidth(w)
-  if Style.FitText then Style.FitText(f.title, w) end
-  -- (22.10., Daniel: "the XP bar is not needed there") the game has its own; step and total count in this chapter
-  f.xpBack:Hide()
-  f.xp:Hide()
-  f.mark:Hide()
-  Style.Content(panel, f, 44, { inset = false })
-end
-
----------------------------------------------------------------------------
--- The path: a line through the icons
----------------------------------------------------------------------------
-function W.Begin(panel)
-  for _, it in ipairs(panel._items or {}) do
-    if it._lvdLine then it._lvdLine:Hide() end
-    if it._lvdDiamond and it.icon and it.icon.SetRotation then pcall(it.icon.SetRotation, it.icon, 0) it._lvdDiamond = nil end
+-- d: name, lo, hi, step, total, progress (0..1), plan (the planned level now, e.g. 6.4)
+function W.Head(panel, d, width)
+  local f = HeadPart()
+  width = width or 300
+  local pct = math.floor((d.progress or 0) * 100 + 0.5)
+  f.ring:SetValue(pct, 100)
+  f.name = d.name or ""
+  f.title:SetText(Kit.Upper(f.name))
+  Kit.Fit(f.title, math.max(20, width - 52 - 8))
+  f.sub:SetText(L["Level %d to %d  ·  step %d of %d"]:format(d.lo or 0, d.hi or 0, d.step or 0, d.total or 0))
+  Kit.Fit(f.sub, math.max(20, width - 52 - 8))
+  local h = HEAD_H
+  f.xpTip = nil
+  if W.XPOn() then
+    h = HEAD_XP_H
+    local lv = UnitLevel and UnitLevel("player") or 1
+    local xp, mx = UnitXP and UnitXP("player") or 0, UnitXPMax and UnitXPMax("player") or 0
+    local v = (tonumber(mx) or 0) > 0 and (tonumber(xp) or 0) / mx or 0
+    f.bar:Layout(math.max(20, width - 52 - 8))
+    f.bar:SetValue(v)
+    local plan = tonumber(d.plan)
+    local mark = nil
+    if plan then mark = plan < lv and 0 or plan >= lv + 1 and 1 or (plan - lv) end
+    f.bar:SetMark(mark)
+    f.bar:Show()
+    f.xpTip = plan and (L["Plan: level %.1f now"]):format(plan) or nil
+  else
+    f.bar:Hide()
   end
-end
-
-function W.Line(row, kind)
-  if not row then return row end
-  local t = row._lvdLine
-  if not t then
-    t = row:CreateTexture(nil, "BACKGROUND")
-    t:SetTexture(WHITE)
-    row._lvdLine = t
-  end
-  local S = Style.SPACING or {}
-  local x = (S.padX or 8) + (row._indent or 0) + math.floor((S.icon or 14) / 2) - 1
-  t:ClearAllPoints()
-  t:SetPoint("TOPLEFT", row, "TOPLEFT", x, kind == "first" and -6 or 0)
-  t:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", x, kind == "last" and 6 or 0)
-  t:SetWidth(2)
-  local c, a = GOLD, 0.85
-  if kind == "next" or kind == "last" then c, a = { 1, 1, 1 }, 0.18 end
-  t:SetVertexColor(c[1], c[2], c[3], a)
-  t:Show()
-  return row
-end
-
--- (Daniel 12.10.: "the current 'Do: ...' bigger and more striking") the step you are on: larger, light gold
-function W.Now(row)
-  if not (row and row.text) then return row end
-  local ok, path = pcall(row.text.GetFont, row.text)
-  if ok and path then pcall(row.text.SetFont, row.text, path, 15, "") end
-  pcall(row.text.SetTextColor, row.text, GOLD_L[1], GOLD_L[2], GOLD_L[3], 1)
-  row._lvdNow = true
-  return row
-end
-
-function W.Done(panel, text, icon)
-  local row = Style.Row(panel):SetText(text, HINT)
-  if icon then row:SetIcon(icon) end
-  if row.icon and row.icon.SetDesaturated then pcall(row.icon.SetDesaturated, row.icon, true) end
-  W.Line(row, "done")
-  return row
-end
-
-function W.Milestone(panel, level)
-  local row = Style.Row(panel):SetText(L["Level %d"]:format(level), GOLD_L)
-  row:SetIcon(WHITE)
-  if row.icon then
-    if row.icon.SetVertexColor then row.icon:SetVertexColor(GOLD_L[1], GOLD_L[2], GOLD_L[3], 1) end
-    if row.icon.SetRotation then pcall(row.icon.SetRotation, row.icon, math.pi / 4) end
-    if row.icon.SetSize then row.icon:SetSize(9, 9) end
-    row._lvdDiamond = true
-  end
-  W.Line(row, "next")
-  return row
+  f.ring:ClearAllPoints()
+  f.ring:SetPoint("LEFT", f, "LEFT", 8, 0)
+  f:SetHeight(h)
+  return Put(panel, f, h)
 end
 
 ---------------------------------------------------------------------------
--- The current station: objectives as blocks, the place, the compass
+-- A line under the head: the preview of an untested chapter (yellow)
 ---------------------------------------------------------------------------
-local station
-local function StationFrame()
-  if station then return station end
-  local f = ns.CreateFrame("Frame", nil, UIParent)
-  f:SetSize(300, COMPASS + 20)
-  f.bg = Tex(f, "BACKGROUND", { 0.35, 0.66, 0.94 }, 0.07)
-  f.bg:SetAllPoints()
-  local a = API()
-  f.compass = a and a.NewCompass and a.NewCompass(f, COMPASS) or nil
-  if f.compass then f.compass:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -2) end
-  f.dist = Font(f, 12, GOLD_L, "CENTER")
-  if f.compass then f.dist:SetPoint("TOP", f.compass, "BOTTOM", 0, 0) else f.dist:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -4) end
-  f.dist:SetWidth(COMPASS + 20)
-  f.lines, f.pips = {}, {}
-  -- (31.10.2026, Leistungsprüfung B10) 10 times a second (was 20). The station hangs in the window (Style.Content sets
-  -- its parent), so it stops with the hidden or collapsed window; until the first build it is not shown at all.
+function W.Note(panel, text, kind, width)
+  local f = parts.note or Part("note", 22)
+  if not f.hint then
+    f.bg = Kit.Fill(f, C.yellowBg)
+    f.hint = Kit.Hint(f)
+    f.hint:SetPoint("LEFT", f, "LEFT", 8, 0)
+  end
+  f.hint:SetHint(text, kind or "warn")
+  f.hint:Layout(math.max(20, (width or 300) - 16))
+  return Put(panel, f, 22)
+end
+
+---------------------------------------------------------------------------
+-- Done: the last finished steps
+---------------------------------------------------------------------------
+function W.Done(panel, list, width)
+  if not list or #list == 0 then return 0 end
+  local f = parts.done or Part("done", S.done)
+  f.rows = f.rows or {}
+  local n = math.min(2, #list)
+  for i = 1, n do
+    local r = f.rows[i]
+    if not r then
+      r = Kit.DoneRow(f)
+      f.rows[i] = r
+    end
+    r:ClearAllPoints()
+    r:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(i - 1) * S.done)
+    r:SetSize(width or 300, S.done)
+    r.plain = W.Plain()
+    r:SetItem(list[i])
+    r:Show()
+  end
+  for i = n + 1, #f.rows do f.rows[i]:Hide() end
+  return Put(panel, f, n * S.done)
+end
+
+---------------------------------------------------------------------------
+-- Card: the step you are on
+---------------------------------------------------------------------------
+local function CardPart()
+  if parts.card then return parts.card end
+  local f = Part("card", 60)
+  f.card = Kit.FocusCard(f, { side = COMPASS })
+  f.card:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+  -- (31.10.2026, Leistungsprüfung B10) 10 times a second with the compass, twice without (only the way's yards). The card
+  -- hangs in the window (Style.Content sets its parent), so it stops with the hidden or collapsed window.
   local elapsed = 0
-  f:SetScript("OnUpdate", function(self, dt)
+  f:SetScript("OnUpdate", function(_, dt)
     elapsed = elapsed + (tonumber(dt) or 0)
-    if elapsed < 0.1 then return end
+    if elapsed < (W.compass and f.card.sideOn and 0.1 or 0.5) then return end
     elapsed = 0
     pcall(W.CompassTick)
   end)
-  f:Hide()
-  station = f
   return f
+end
+W.CardPart = CardPart -- (tests)
+
+local function Yards(d)
+  if type(d) ~= "number" then return nil end
+  return (L["%d yd"]):format(math.floor(d + 0.5))
+end
+
+-- the way's line: the place and how far ("Mulgore · 45.8, 57.2 · 340 yd")
+local function WayText()
+  local w = W._way
+  if not w then return nil end
+  local text = w.text
+  local yd
+  local st = W._state
+  if st and type(st.distShort) == "string" and st.distShort ~= "" then yd = st.distShort
+  else
+    local a = API()
+    if a and a.DistanceTo and w.m then
+      local ok, d = pcall(a.DistanceTo, w.m, w.x / 100, w.y / 100)
+      if ok then yd = Yards(d) end
+    end
+  end
+  if yd then text = text .. "  ·  " .. yd end
+  return text
 end
 
 function W.CompassTick()
-  local f = station
-  if not (f and f.compass) then return end
-  local a = API()
-  local st = a and a.ArrowState and a.ArrowState() or {}
-  local facing = GetPlayerFacing and GetPlayerFacing() or nil
-  if type(facing) ~= "number" then facing = nil end
-  f.compass:Arrived(st.seal)
-  if st.needle and type(st.angle) == "number" and facing then
-    -- (Daniel 12.10.: "the arrow towards the quest target, the minimap shows where to walk") the target itself
-    local bearing = type(st.bearing) == "number" and st.bearing or (-st.angle - facing)
-    f.compass:Point(bearing, facing, st.nearness)
-  else
-    f.compass:Point(nil, facing)
+  local f = parts.card
+  if not f then return end
+  W._state = nil
+  local cp = W.compass
+  if cp and f.card.sideOn then
+    local a = API()
+    local st = a and a.ArrowState and a.ArrowState() or {}
+    W._state = st
+    local facing = GetPlayerFacing and GetPlayerFacing() or nil
+    if type(facing) ~= "number" then facing = nil end
+    cp:Arrived(st.seal)
+    if st.needle and type(st.angle) == "number" and facing then
+      -- (Daniel 12.10.: "the arrow towards the quest target, the minimap shows where to walk") the target itself
+      local bearing = type(st.bearing) == "number" and st.bearing or (-st.angle - facing)
+      cp:Point(bearing, facing, st.nearness)
+    else
+      cp:Point(nil, facing)
+    end
   end
-  local text = type(st.distText) == "string" and st.distText or ""
-  -- (Questdon review 5) Questdon's own parts ("240 yards" / "the way around") like on its card; a text that does
-  -- not start with the distance ("In the objective area, nearest spot 52 yards") goes whole to the hint line under the
-  -- compass (it was empty: the narrow distance line has no room for it)
-  local short, way = st.distShort, st.distWay
-  if type(short) ~= "string" then
-    short = text:match("^[%d%.,]+%s*[^%s,]*") -- (12.10.) "39 yards" without the comma before the way hint
-    way = text:match("^[%d%.,]+%s*%S*,%s*(.+)$")
-    if not short then short, way = "", text end
-  end
-  f.dist:SetText(short or "")
-  if f.way then f.way:SetText(type(way) == "string" and way or "") end
+  if not W.SHOW_WAY then return end
+  local t = WayText()
+  if t and t ~= W._wayShown then W._wayShown = t f.card:SetWay(t) end
 end
 
-local function Line(f, i)
-  local fs = f.lines[i]
-  if not fs then fs = Font(f, 11, SECOND, "LEFT") f.lines[i] = fs end
-  fs:Show()
-  return fs
-end
-
--- objs: { { text, done, have, need } }, where: "Mulgore · 45.8, 57.2"; returns the height
--- along: { title, objs } a quest to do along here (Daniel 12.10.: "it gets lost, written so small")
-function W.Station(panel, objs, where, width, along)
-  local f = StationFrame()
-  for _, fs in ipairs(f.lines) do fs:Hide() end
-  for _, fs in ipairs(f.alongs or {}) do fs:Hide() end
-  for _, t in ipairs(f.pips) do t:Hide() end
-  -- (31.10.2026) the compass off: hidden, and the text takes its room
-  local cp = CompassOn() and f.compass or nil
-  if f.compass then if cp then f.compass:Show() f.dist:Show() else f.compass:Hide() f.dist:Hide() end end
-  local textW = (width or 300) - (cp and COMPASS + 26 or 16)
-  -- (Daniel 12.10.: "the middle part with the count could sit more in the middle") the block centred on the
-  -- compass: its height first, then the top
-  local need = 12 + (where and 14 or 0)
-  local cnt = 0
-  for _, o in ipairs(objs or {}) do
-    if cnt >= 4 then break end
-    cnt = cnt + 1
-    need = need + 14 + ((o.need and o.need > 1 and not o.done) and 8 or 0)
+-- data: the FocusCard's data (Kit.FocusCard SetData) plus way = { text, m, x, y }; returns the height
+function W.Card(panel, data, width)
+  local f = CardPart()
+  local card = f.card
+  -- the compass: Questdon's (or DonMap's) in the card's side room, only with the option
+  if CompassOn() and not W.compass then
+    local a = API()
+    W.compass = a and a.NewCompass and a.NewCompass(card.side, COMPASS) or nil
+    if W.compass then W.compass:SetPoint("TOP", card.side, "TOP", 0, 0) end
   end
-  local alongN = 0
-  if along then
-    need = need + 18
-    for _, o in ipairs(along.objs or {}) do
-      if alongN < 3 and not o.done then
-        alongN = alongN + 1
-        need = need + 14 + ((o.need and o.need > 1) and 8 or 0)
-      end
-    end
-  end
-  -- (21.10., Daniel: "what else is to do in this area") further quests with open objectives right here: a gold
-  -- line each and up to two objectives (the first one above has up to three)
-  if along and along.more then
-    for k = 1, math.min(2, #along.more) do
-      need = need + 18
-      local c = 0
-      for _, o in ipairs(along.more[k].objs or {}) do
-        if c < 2 and not o.done then c = c + 1 need = need + 14 + ((o.need and o.need > 1) and 8 or 0) end
-      end
-    end
-  end
-  local full = math.max(need + 6, cp and COMPASS + 18 or 20)
-  local y, n, np = math.max(4, math.floor((full - need) / 2)), 0, 0
-  local function Pip()
-    np = np + 1
-    local t = f.pips[np]
-    if not t then t = Tex(f, "ARTWORK", GOLD_L, 1) f.pips[np] = t end
-    t:Show()
-    return t
-  end
-  local function Objective(o, color)
-    n = n + 1
-    local fs = Line(f, n)
-    fs:SetWidth(textW)
-    fs:ClearAllPoints()
-    fs:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -y)
-    fs:SetText(o.text or "")
-    Color(fs, o.done and GREEN or (color or SECOND))
-    if Style.FitText then Style.FitText(fs, textW - 18) end
-    y = y + 14
-    if o.need and o.need > 1 and not o.done then
-      local have = math.max(0, math.min(o.need, o.have or 0))
-      local bw = textW - 18
-      if o.need <= 12 then
-        local gap = 2
-        local w = (bw - gap * (o.need - 1)) / o.need
-        for k = 1, o.need do
-          local t = Pip()
-          t:ClearAllPoints()
-          t:SetPoint("TOPLEFT", f, "TOPLEFT", 26 + (k - 1) * (w + gap), -y)
-          t:SetSize(math.max(1, w), 5)
-          if k <= have then t:SetVertexColor(0.62, 0.81, 1, 1) else t:SetVertexColor(1, 1, 1, 0.12) end
-        end
-      else
-        local back = Pip()
-        back:ClearAllPoints() back:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -y) back:SetSize(bw, 5) back:SetVertexColor(1, 1, 1, 0.12)
-        if have > 0 then
-          local fill = Pip()
-          fill:ClearAllPoints() fill:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -y) fill:SetSize(math.max(1, bw * have / o.need), 5)
-          fill:SetVertexColor(0.62, 0.81, 1, 1)
-        end
-      end
-      y = y + 8
-    end
-  end
-  local shown = 0
-  for _, o in ipairs(objs or {}) do
-    if shown >= 4 then break end
-    shown = shown + 1
-    Objective(o)
-  end
-  -- the quest to do along here: a gold line, then its open objectives with their blocks
-  if along then
-    if not f.along then f.along = Font(f, 12, GOLD, "LEFT") end
-    f.along:SetWidth(textW)
-    f.along:ClearAllPoints()
-    f.along:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -(y + 4))
-    f.along:SetText((L["Along here: %s"]):format(along.title or "?"))
-    if Style.FitText then Style.FitText(f.along, textW) end
-    f.along:Show()
-    y = y + 18
-    local k = 0
-    for _, o in ipairs(along.objs or {}) do
-      if k >= alongN then break end
-      if not o.done then k = k + 1 Objective(o, CREAM) end
-    end
-    for mi = 1, math.min(2, #(along.more or {})) do
-      local q2 = along.more[mi]
-      f.alongs = f.alongs or {}
-      local fs = f.alongs[mi]
-      if not fs then fs = Font(f, 12, GOLD, "LEFT") f.alongs[mi] = fs end
-      fs:SetWidth(textW)
-      fs:ClearAllPoints()
-      fs:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -(y + 4))
-      fs:SetText((L["Along here: %s"]):format(q2.title or "?"))
-      if Style.FitText then Style.FitText(fs, textW) end
-      fs:Show()
-      y = y + 18
-      local c = 0
-      for _, o in ipairs(q2.objs or {}) do
-        if c >= 2 then break end
-        if not o.done then c = c + 1 Objective(o, CREAM) end
-      end
-    end
-  elseif f.along then
-    f.along:Hide()
-  end
-  if where then
-    n = n + 1
-    local fs = Line(f, n)
-    fs:SetWidth(textW)
-    fs:ClearAllPoints()
-    fs:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -y)
-    fs:SetText(where)
-    Color(fs, HINT)
-    y = y + 14
-  end
-  if not f.way then f.way = Font(f, 10, { 0.96, 0.84, 0.48 }, "LEFT") end
-  f.way:SetWidth(textW)
-  f.way:ClearAllPoints()
-  f.way:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -y)
-  y = y + 12
-  local h = math.max(y + 2, cp and COMPASS + 18 or 20)
-  Style.Content(panel, f, h, { inset = false })
+  card:SetSide(CompassOn() and W.compass ~= nil)
+  W._way = data.way
+  W._wayShown = nil
+  data.way = nil
+  card:SetData(data)
+  data.way = W._way and W._way.text or nil
+  card.data.way = W.SHOW_WAY and (WayText() or data.way) or nil
+  card:SetPlain(W.Plain())
+  local h = card:Layout(width or 300)
+  f:SetHeight(h)
+  W._wayShown = card.data.way
+  Put(panel, f, h)
   W.CompassTick()
   return h
 end
 
 ---------------------------------------------------------------------------
--- After a build: Questdon's arrow steps aside while our compass shows the way
+-- Foot: where you are in the route
 ---------------------------------------------------------------------------
--- (17.10., Daniel: "an option to hide background and borders") /lvd options "No background and frame": the window
--- without background, frame and title bar background, and the speedrun line, chapter banner and station without
--- their own fills; text, compass, bars and the title bar's buttons stay
-function W.ApplyPlain(panel)
-  local plain = DB().plain ~= false -- (25.10.) on unless switched off
-  if panel and panel.SetChromeHidden and (panel.IsChromeHidden and panel:IsChromeHidden()) ~= plain then panel:SetChromeHidden(plain) end
-  -- (17.10.) not ipairs over { runFrame, banner, station }: with the speedrun line off runFrame is nil and ipairs
-  -- stopped right there, so the chapter's and the step's boxes stayed
-  for _, f in pairs({ r = runFrame, b = banner, s = station, l = ns.LvdList and ns.LvdList.f }) do
-    if f.bg then if plain then f.bg:Hide() else f.bg:Show() end end
+function W.Foot(panel, step, total, chapter, width)
+  local f = parts.foot
+  if not f then
+    f = Part("foot", FOOT_H)
+    f.bg = Kit.Fill(f, C.panel)
+    f.line = Kit.Tex(f, "ARTWORK", C.divider)
+    f.line:SetPoint("TOPLEFT") f.line:SetPoint("TOPRIGHT") f.line:SetHeight(1)
+    f.left = Kit.Text(f, "sub", C.muted)
+    f.left:SetPoint("LEFT", f, "LEFT", 8, 0)
+    f.right = Kit.Text(f, "sub", C.txGold, "RIGHT")
+    f.right:SetPoint("RIGHT", f, "RIGHT", -20, 0) -- room for the size handle
+    f.bar = Kit.ProgressBar(f)
   end
+  width = width or 300
+  f.left:SetText((L["Step %d of %d"]):format(step or 0, total or 0))
+  f.right:SetText((L["chapter %d%%"]):format(math.floor((chapter or 0) * 100 + 0.5)))
+  local lw = math.min(Kit.TextWidth(f.left), math.floor(width * 0.4))
+  local rw = math.min(Kit.TextWidth(f.right), math.floor(width * 0.3))
+  Kit.Fit(f.left, math.max(1, lw))
+  Kit.Fit(f.right, math.max(1, rw))
+  local bw = width - 8 - lw - 12 - 12 - rw - 20
+  if bw >= 30 then
+    f.bar:ClearAllPoints()
+    f.bar:SetPoint("LEFT", f, "LEFT", 8 + lw + 12, 0)
+    f.bar:Layout(bw)
+    f.bar:SetValue((total or 0) > 0 and (step or 0) / total or 0)
+    f.bar:Show()
+  else
+    f.bar:Hide()
+  end
+  return Put(panel, f, FOOT_H)
 end
 
+---------------------------------------------------------------------------
+-- Without background and frame: the panel's chrome and the parts' fills go, lines, marks and texts stay (variant A)
+---------------------------------------------------------------------------
+-- (17.10., Daniel: "an option to hide background and borders") /lvd options "No background and frame"
+function W.ApplyPlain(panel)
+  local plain = W.Plain()
+  if panel and panel.SetChromeHidden and (panel.IsChromeHidden and panel:IsChromeHidden()) ~= plain then panel:SetChromeHidden(plain) end
+  for _, f in pairs(parts) do
+    if f.bg then if plain then f.bg:Hide() else f.bg:Show() end end
+  end
+  if parts.card then parts.card.card:SetPlain(plain) end
+  for _, r in ipairs(parts.done and parts.done.rows or {}) do r.plain = plain Kit.Refresh(r) end
+  local l = ns.LvdList and ns.LvdList.list
+  if l and (l.plain and true or false) ~= plain then l:SetPlain(plain) end
+end
+
+---------------------------------------------------------------------------
+-- After a build: Questdon's arrow steps aside while our compass shows the way; Questdon's list docks under the window
+---------------------------------------------------------------------------
 function W.Finish(panel)
   W.ApplyPlain(panel)
   local a = API()
   local on = panel and panel:IsShown() and not (panel.IsCollapsed and panel:IsCollapsed()) and CompassOn()
-    and station ~= nil and station.compass ~= nil
+    and parts.card ~= nil and W.compass ~= nil
   if a and a.SetGuideCompass and W._guide ~= on then
     W._guide = on
     a.SetGuideCompass(on)
   end
-  -- (0.1.8, Daniel 12.10.: both windows open, "dock it") Questdon's quest list hangs under this window
-  local frame = panel and panel:IsShown() and panel or nil
+  -- (0.1.8, Daniel 12.10.: both windows open, "dock it") Questdon's quest list hangs under this window; (02.11.2026, Daniel:
+  -- "questdons fenster frei beweglich machen, und standardweise aus, das hindert nur") only with the option, off by default
+  local frame = panel and panel:IsShown() and DB().dock == true and panel or nil
   if a and a.SetGuideFrame and W._dock ~= frame then
     W._dock = frame
     a.SetGuideFrame(frame)
   end
 end
 
--- Shift + mouse wheel over the title bar: the background's opacity (down to nothing, frame included)
 -- (23.10., /lvd mem) the window's parts by name (inner within "window build")
 if ns.Track then
   W.Run = ns.Track("win run", W.Run)
-  W.Banner = ns.Track("win banner", W.Banner)
-  W.Station = ns.Track("win station", W.Station)
+  W.Head = ns.Track("win head", W.Head)
+  W.Card = ns.Track("win card", W.Card)
   W.Finish = ns.Track("win finish", W.Finish)
 end
 
+-- Shift + mouse wheel over the title bar: the background's opacity (down to nothing, frame included)
 function W.WheelAlpha(panel, delta)
   if not (IsShiftKeyDown and IsShiftKeyDown()) or not panel then return false end
   local a = panel._bgAlpha or Style.DEFAULT_ALPHA

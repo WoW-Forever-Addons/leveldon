@@ -5,10 +5,11 @@ local L = ns.L
 -- (0.1.7, Daniel 11.10.: "can the addon write along while I play, walking ways, turn-ins, accepts,
 -- buys, everything, to make better routes from it") The recorder.
 --
--- While you play (option off by default since 31.10.2026, /lvd rec on), Leveldon writes down per session:
+-- While you play (on by default since 31.10.2026, /lvd rec off stops it), Leveldon writes down per session
+-- (a /reload goes on in the same session, 03.11.2026):
 --   where you walk (a point every few seconds when you moved, not on a flight),
 --   quests accepted, turned in (with XP and money) and abandoned, level ups, deaths,
---   flights, hearthstone, every NPC you talk to (once per session),
+--   flights, hearthstone, every NPC you talk to (once per session, again after a /reload),
 --   what you bought and sold at a vendor and what you learned at a trainer (with the cost),
 --   the guide's step changes (done, skipped, back) and, per minute, XP from mobs,
 --   kills by mob and time in combat.
@@ -17,7 +18,9 @@ local L = ns.L
 -- the reports keep your text. Old sessions go first when it gets too big.
 -- Event lines: "<seconds since session start> <kind> <values ...>", see EVENT KINDS below.
 ---------------------------------------------------------------------------
-local MAX_SESSIONS = 40
+-- (03.11.2026, docs/PIPELINE_PRUEFUNG_2026-11-03.md 11) 150 instead of 40: a /reload no longer starts a session, so a
+-- session is one sitting. The size stays bound by MAX_EVENTS and MAX_POINTS (a session table itself is small).
+local MAX_SESSIONS = 150
 local MAX_EVENTS = 60000   -- all sessions together
 local MAX_POINTS = 120000  -- walking points, all sessions together
 local SAMPLE = 3           -- seconds between walking points
@@ -31,7 +34,8 @@ local BUCKET = 60          -- seconds per XP/kill/combat line
 --   F m x y / f m x y          flight start / landing  H m x y                          hearthstone cast
 --   N npc m x y                talked to an NPC        B item count copper npc          bought
 --   S copper npc               sold (money in)         R spell                          learned a spell
---   W npc copper secs          trainer visit           G i ri k q how                   guide step (how: d s b f)
+--   W npc copper secs trade    trainer visit           G i ri k q how                   guide step (how: d s b f)
+--                              (trade 1: a profession trainer)
 --   K xp kills combat n:c,...  per minute              Q reason step q                  a report (text in reports)
 --   I m x y / O m x y          went inside (cave, mine, building) / outside again: the way in
 -- (Daniel 11.10.: "1 to 7 except 3")
@@ -46,9 +50,11 @@ local BUCKET = 60          -- seconds per XP/kill/combat line
 --   E inst type mapID / e inst secs   into an instance / out again (the quests in between were done there)
 --   D m x y npc                died (npc: your target then); U m x y: alive again (the time between
 --                              is the way back); L level rested: level up with the rested XP left
+--   r secs                     (03.11.2026) a /reload: the session goes on, secs seconds after the logout before it
 -- Walking points: "<seconds> <map> <x> <y>" and " i" when inside (Daniel 11.10.: the arrow through a
 -- mine's wall: the ways in and the tunnels people walked, for Questdon's arrow)
 local rec, sess, t0
+local resumeCheck -- (03.11.2026) the first PLAYER_ENTERING_WORLD after the login: a /reload or a login
 local function Now() return GetTime and GetTime() or 0 end
 local function Clock() return time and time() or 0 end
 local function Num(v) return type(v) == "number" and v == v and v or nil end
@@ -66,7 +72,9 @@ end
 -- (31.10.2026, Daniel: "standardweise gerne an, wir brauchen die Daten") on unless switched off with /lvd rec off
 -- (LeveldonDB.recOff).
 -- While off nothing runs: no ticker, no quest log scan, no events (besides PLAYER_LOGIN).
-local function On() return LeveldonDB ~= nil and LeveldonDB.recOff ~= true end
+-- (03.11.2026, docs/PIPELINE_PRUEFUNG_2026-11-03.md 5) also without LeveldonDB: the first login after a new install has
+-- none yet (Start makes it); before, On() was false then and the first session went unrecorded.
+local function On() return not (LeveldonDB and LeveldonDB.recOff == true) end
 
 local function Pos()
   local m = C_Map and Call(C_Map.GetBestMapForUnit, "player")
@@ -133,12 +141,56 @@ local function Start()
   sess = { c = (name or "?") .. "-" .. (realm or ""), r = race, cl = cls, s = Clock(), lv = Level(),
     xp = Num(Call(UnitXP, "player")), route = ns.LeveldonRouteKey and ns.LeveldonRouteKey() or nil,
     rid = ns.LeveldonRouteId and ns.LeveldonRouteId() or nil, -- (13.10.) the exact route bands played
-    ver = ns.LeveldonVersion, m = Money(), rest = Num(Call(GetXPExhaustion)) or 0, e = {}, p = {} }
+    ver = ns.LeveldonVersion, m = Money(), rest = Num(Call(GetXPExhaustion)) or 0, e = {}, p = {},
+    g0 = t0 } -- (03.11.2026) GetTime at the start: a /reload goes on from here (Resume)
   rec.sessions[#rec.sessions + 1] = sess
   Recount()
   Trim()
 end
 ns.RecSession = function() return sess end -- (tests)
+
+-- (03.11.2026, docs/PIPELINE_PRUEFUNG_2026-11-03.md 11) A /reload went on as a new session (74 of 129 sessions were
+-- shorter than 10 minutes, 67 of 108 began at most 60 s after the one before). Now, at the first PLAYER_ENTERING_WORLD
+-- after the login: was it a /reload (the event says so: isReloadingUi; an old client without the values: at most
+-- RELOAD_GAP seconds after the logout), same character, version and route, then the new session goes into the one
+-- before: its lines on the old clock (GetTime runs on through a /reload), an "r" line at the seam, no end time
+-- until the next logout. A login (isInitialLogin) always starts its own session.
+local RELOAD_GAP = 60      -- seconds from the logout, when the event does not say
+local RELOAD_GAP_SURE = 600 -- the event says /reload: still no session over a long break
+local function Rebase(lines, off)
+  for i, line in ipairs(lines) do
+    local t, rest = line:match("^(%-?%d+)(.*)$")
+    if t then lines[i] = tostring(tonumber(t) + off) .. rest end
+  end
+end
+local function Resume(isLogin, isReload)
+  if not resumeCheck then return end
+  resumeCheck = nil
+  if not (sess and rec) or isLogin == true or isReload == false then return end
+  local n = #rec.sessions
+  local prev = rec.sessions[n - 1]
+  if rec.sessions[n] ~= sess or type(prev) ~= "table" or type(prev.e) ~= "table" or type(prev.p) ~= "table" then return end
+  if prev.c ~= sess.c or prev.ver ~= sess.ver or prev.route ~= sess.route or prev.rid ~= sess.rid then return end
+  local gap = Num(prev.endAt) and Num(sess.s) and sess.s - prev.endAt
+  if not gap or gap < 0 or gap > (isReload == true and RELOAD_GAP_SURE or RELOAD_GAP) then return end
+  -- the old clock: GetTime at its start, when it fits the wall clock (same game, no restart), else by the wall clock
+  local base = t0 - (sess.s - (Num(prev.s) or sess.s))
+  if Num(prev.g0) and math.abs((t0 - prev.g0) - (sess.s - (Num(prev.s) or sess.s))) <= 5 then base = prev.g0 end
+  local off = math.floor(t0 - base + 0.5)
+  Rebase(sess.e, off)
+  Rebase(sess.p, off)
+  prev.e[#prev.e + 1] = ("%d r %d"):format(off, gap)
+  for _, line in ipairs(sess.e) do prev.e[#prev.e + 1] = line end
+  for _, line in ipairs(sess.p) do prev.p[#prev.p + 1] = line end
+  prev.endAt = nil
+  prev.lv2 = math.max(prev.lv2 or prev.lv or 0, sess.lv2 or sess.lv or 0)
+  prev.rl = (Num(prev.rl) or 0) + 1 -- /reloads in this session
+  table.remove(rec.sessions, n)
+  sess, t0 = prev, t0 - off
+  Recount()
+  Trim()
+end
+ns.RecResume = Resume -- (tests)
 
 ---------------------------------------------------------------------------
 -- walking points
@@ -340,10 +392,13 @@ local f = ns.CreateFrame("Frame")
 f:SetScript("OnEvent", function(_, e, ...)
   if e == "PLAYER_LOGIN" then
     if On() and ns.RecBegin then ns.RecBegin() end
+    resumeCheck = sess ~= nil or nil -- (03.11.2026) only a session begun at login can be a /reload's (not /lvd rec on)
     return
   end
   if not (sess and On()) then return end
-  if e == "QUEST_ACCEPTED" then
+  if e == "PLAYER_ENTERING_WORLD" then
+    Resume(...)
+  elseif e == "QUEST_ACCEPTED" then
     local a, b = ...
     local q = Num(b) or Num(a) -- (the old clients send the log index first)
     if q and q > 0 then Ev("A", q, PosText(), Level(), ns.LeveldonCur and ns.LeveldonCur() or 0) end
@@ -415,7 +470,7 @@ local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "PLAYER_L
   "PLAYER_XP_UPDATE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_ALIVE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
   "MERCHANT_SHOW", "MERCHANT_CLOSED", "TRAINER_SHOW", "TRAINER_CLOSED",
   "LEARNED_SPELL_IN_TAB", "GOSSIP_SHOW", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_GREETING",
-  "TAXIMAP_OPENED", "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_LOGOUT" }
+  "TAXIMAP_OPENED", "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_LOGOUT", "PLAYER_ENTERING_WORLD" }
 pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 
 ---------------------------------------------------------------------------
@@ -592,7 +647,7 @@ function ns.RecStop()
     sess.endAt = Clock()
     sess.lv2 = math.max(sess.lv2 or sess.lv or 0, Level())
   end
-  sess, last, wasInside, onTaxi = nil, nil, nil, false
+  sess, last, wasInside, onTaxi, resumeCheck = nil, nil, nil, false, nil
   more.objs, more.pause, more.still, more.group, more.inst = nil, nil, nil, nil, nil
 end
 

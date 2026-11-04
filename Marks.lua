@@ -138,14 +138,17 @@ end
 local MEDIA = "Interface\\AddOns\\DonMap\\Media\\" -- (31.10.2026) DonMap has the same needles; Questdon may be missing
 -- (Daniel 12.10.: "our arrow may be more striking") bigger, a brighter halo and a small bob down to the NPC
 local SIZE, LIFT, BOB = 46, 12, 7
+-- (02.11.2026, StyleKit 2 step 4) accept, turn in and the named mob in the Don style's colours (DonCore Kit.C); trainer,
+-- vendor, flight master and innkeeper keep their own (the kit has no teal, orange or violet)
+local KC = ns.Kit and ns.Kit.C or {}
 local COLORS = {
-  [1] = { 1.00, 0.82, 0.25 },  -- accept: gold
-  [4] = { 0.40, 0.92, 0.45 },  -- turn in: green
+  [1] = KC.yellow or { 1.00, 0.82, 0.25 },  -- accept: gold
+  [4] = KC.green or { 0.40, 0.92, 0.45 },   -- turn in: green
   [6] = { 0.25, 0.86, 0.82 },  -- trainer: teal
   [2] = { 1.00, 0.60, 0.20 },  -- vendor: orange
   [3] = { 0.74, 0.56, 1.00 },  -- flight master: violet
   [5] = { 0.74, 0.56, 1.00 },  -- innkeeper: violet
-  [8] = { 1.00, 0.30, 0.25 },  -- named mob: red
+  [8] = KC.red or { 1.00, 0.30, 0.25 },    -- named mob: red
 }
 local frames, free = {}, {} -- [unit] = frame
 local function Take()

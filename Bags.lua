@@ -20,7 +20,8 @@ local _, ns = ...
 local BG = {}
 ns.LvdBags = BG
 
-local BLUE = { 0.25, 0.66, 0.96 } -- the blue of the tooltip line "Leveldon: needed later for ..."
+-- (02.11.2026, StyleKit 2 step 4) the Don style's blue (DonCore Kit.C.blue), as the tooltip line "Leveldon: needed later for ..."
+local BLUE = ns.Kit and ns.Kit.C.blue or { 0.16, 0.71, 0.96 }
 local WHITE = "Interface\\Buttons\\WHITE8x8"
 local POLL = 0.5                  -- seconds between two looks at the bag windows
 local FRAMES = 13                 -- NUM_CONTAINER_FRAMES

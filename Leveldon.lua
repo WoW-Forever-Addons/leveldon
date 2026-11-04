@@ -1,6 +1,14 @@
 local addonName, ns = ...
 local L = ns.L -- (12.10.) Locales.lua: the texts in the client's language (English is the key)
 local Style = ns.Style
+-- (04.11.2026, Era-Test, Daniel: "nur Spieldaten sammeln ... schreibt trotzdem Chat-Nachrichten") one gate for every
+-- hint Leveldon writes into the chat by itself (keep, riding, not offered yet, lucky find, before you go, ship, trainer,
+-- professions, class quest, ahead, Fit.lua): silent while "Only record your run" is on. Answers to the player's own
+-- /lvd commands keep using print.
+function ns.Say(msg)
+  if msg == nil or (ns.RecordOnly and ns.RecordOnly()) then return end
+  print(msg)
+end
 
 ---------------------------------------------------------------------------
 -- Leveldon 0.1 test build (Daniel 09.10.: "eine Route testen, wie das Feeling ist").
@@ -169,7 +177,6 @@ local function LoadRoute()
 end
 ns.LoadRoute = LoadRoute
 ns.RouteInfo = function() return routeInfo end
-local NEXT_SHOWN = 3
 local GRAY = 8 -- a quest this many levels below the character is skipped
 
 local db
@@ -316,7 +323,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.2.9"
+local VERSION = "0.3.0"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -665,13 +672,13 @@ local BUY_PRICE = { [2901] = 10, [7005] = 10, [6256] = 23, [6529] = 50, [6325] =
 local SELLS = {} -- vendor name -> { [item] = true }
 do
 local SELLERS_OF = {
-  [2901] = "Abigail Shiel;Andrew Hilbert;Banalash;Billibub Cogspinner;Brother Danil;Christoph Jeffcoat;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Elisa Steelhand;Elizabeth Van Talen;Felicia Doan;Felika;Flakk;Gigget Zipcoil;Gina MacGregor;Helenia Olden;Herble Baubbletump;Jandia;Jase Farlane;Keena;Kireena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Loslor Rudge;Micha Yance;Mishta;Narret Shadowgrove;Neal Allen;Nerrist;Qia;Ranik;Samuel Van Brunt;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tari'qa;Taur Stonehoof;Tharynn Bouden;Thrawn Boltar;Ullanna;Vivianna;Wunna Darkmane",
-  [7005] = "Abigail Shiel;Andrew Hilbert;Banalash;Bombus Finespindle;Brother Danil;Christopher Hewen;Dalria;Drake Lindgren;Duokna;Edna Mullby;Felicia Doan;Felika;Flakk;Gigget Zipcoil;Gina MacGregor;Helenia Olden;Jase Farlane;Keena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Mishta;Narret Shadowgrove;Nerrist;Qia;Ranik;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tamar;Tari'qa;Tharynn Bouden;Ullanna;Vivianna;Wunna Darkmane",
-  [6256] = "Abigail Shiel;Andrew Hilbert;Banalash;Catherine Leland;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Felicia Doan;Felika;Flakk;Gigget Zipcoil;Gina MacGregor;Gretta Ganter;Harn Longcast;Helenia Olden;Jase Farlane;Keena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Martine Tramblay;Mishta;Narret Shadowgrove;Nerrist;Nessa Shadowsong;Qia;Ranik;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tari'qa;Tharynn Bouden;Ullanna;Vivianna;Voloren;Wunna Darkmane;Zansoa",
-  [6529] = "Abigail Shiel;Andrew Hilbert;Catherine Leland;Christopher Hewen;Drake Lindgren;Felicia Doan;Felika;Flakk;Gina MacGregor;Gretta Ganter;Harn Longcast;Kulwia;Lah'Mawhani;Martine Tramblay;Narret Shadowgrove;Nessa Shadowsong;Ranik;Shimra;Tai'tasi;Tari'qa;Tharynn Bouden;Ullanna;Voloren;Wunna Darkmane;Zansoa",
-  [6325] = "Catherine Leland;Gretta Ganter;Harn Longcast;Martine Tramblay;Tharynn Bouden",
+  [2901] = "Abigail Shiel;Adlin Pridedrift;Aedi Thriceforged;Andrew Hilbert;Banalash;Billibub Cogspinner;Brother Danil;Christoph Jeffcoat;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Elisa Steelhand;Elizabeth Van Talen;Felicia Doan;Felika;Flakk;Fradd Swiftgear;Gigget Zipcoil;Gina MacGregor;Hammon Karwn;Helenia Olden;Herble Baubbletump;Jandia;Jase Farlane;Keena;Kireena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Loslor Rudge;Micha Yance;Mishta;Narret Shadowgrove;Neal Allen;Nerrist;Qia;Ranik;Samuel Van Brunt;Sarah Killian;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tari'qa;Taur Stonehoof;Tharynn Bouden;Thrawn Boltar;Ullanna;Vivianna;Wuark;Wunna Darkmane",
+  [7005] = "Abigail Shiel;Adlin Pridedrift;Andrew Hilbert;Banalash;Bombus Finespindle;Brother Danil;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Felicia Doan;Felika;Flakk;Gigget Zipcoil;Gina MacGregor;Hammon Karwn;Helenia Olden;Jase Farlane;Keena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Mishta;Narret Shadowgrove;Nerrist;Qia;Ranik;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tamar;Tari'qa;Tharynn Bouden;Ullanna;Vivianna;Wunna Darkmane",
+  [6256] = "Abigail Shiel;Andrew Hilbert;Banalash;Catherine Leland;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Felicia Doan;Felika;Flakk;Gigget Zipcoil;Gina MacGregor;Gretta Ganter;Hammon Karwn;Harn Longcast;Helenia Olden;Jase Farlane;Keena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Martine Tramblay;Mishta;Narret Shadowgrove;Nerrist;Nessa Shadowsong;Qia;Ranik;Sewa Mistrunner;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tari'qa;Tharynn Bouden;Ullanna;Vivianna;Voloren;Wik'Tar;Wunna Darkmane;Zansoa",
+  [6529] = "Abigail Shiel;Andrew Hilbert;Catherine Leland;Christopher Hewen;Drake Lindgren;Edna Mullby;Felicia Doan;Felika;Flakk;Gina MacGregor;Gretta Ganter;Harn Longcast;Kulwia;Lah'Mawhani;Martine Tramblay;Narret Shadowgrove;Nessa Shadowsong;Ranik;Sewa Mistrunner;Shimra;Tai'tasi;Tari'qa;Tharynn Bouden;Ullanna;Voloren;Wik'Tar;Wunna Darkmane;Zansoa",
+  [6325] = "Catherine Leland;Gretta Ganter;Harn Longcast;Martine Tramblay;Sewa Mistrunner;Tharynn Bouden",
   [6326] = "Martine Tramblay;Nessa Shadowsong;Zansoa",
-  [5956] = "Abigail Shiel;Andrew Hilbert;Banalash;Billibub Cogspinner;Christoph Jeffcoat;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Elisa Steelhand;Elizabeth Van Talen;Felicia Doan;Felika;Flakk;Gigget Zipcoil;Gina MacGregor;Helenia Olden;Herble Baubbletump;Jandia;Jase Farlane;Keena;Kireena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Loslor Rudge;Micha Yance;Mishta;Narret Shadowgrove;Neal Allen;Nerrist;Qia;Ranik;Samuel Van Brunt;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tari'qa;Taur Stonehoof;Tharynn Bouden;Thrawn Boltar;Ullanna;Vivianna;Wunna Darkmane",
+  [5956] = "Abigail Shiel;Aedi Thriceforged;Andrew Hilbert;Banalash;Billibub Cogspinner;Christoph Jeffcoat;Christopher Hewen;Dalria;Drake Lindgren;Edna Mullby;Elisa Steelhand;Elizabeth Van Talen;Felicia Doan;Felika;Flakk;Fradd Swiftgear;Gigget Zipcoil;Gina MacGregor;Hammon Karwn;Helenia Olden;Herble Baubbletump;Jandia;Jase Farlane;Keena;Kireena;Kulwia;Lah'Mawhani;Lorelae Wintersong;Loslor Rudge;Micha Yance;Mishta;Narret Shadowgrove;Neal Allen;Nerrist;Qia;Ranik;Samuel Van Brunt;Shadi Mistrunner;Shandrina;Sheendra Tallgrass;Shimra;Syurana;Tai'tasi;Tari'qa;Taur Stonehoof;Tharynn Bouden;Thrawn Boltar;Ullanna;Vivianna;Wunna Darkmane",
 }
 for i, list in pairs(SELLERS_OF) do
   for n in list:gmatch("[^;]+") do SELLS[n] = SELLS[n] or {} SELLS[n][i] = true end
@@ -967,7 +974,7 @@ function ns.TR.Recommend()
   elseif other > 0 then
     msg = (L["|cff3fa9f5Level|rdon: nothing important here now; the %d spells are your choice (the gold goes to riding at 40)."]):format(other)
   end
-  if msg then print(msg) end
+  if msg then ns.Say(msg) end
   return msg
 end
 -- (15.10., Daniel: "stay at 40") riding at 40 costs 100 gold training and 20 gold for the mount (Warcraft Tavern,
@@ -998,7 +1005,7 @@ ns.MountReminder = function()
   if not (db and db.mountLater) or ns._mountTold or ns.RidingKnown() or Level() < 40 then return end
   if ns.MountShort() then return end
   ns._mountTold = true
-  print((L["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."]):format(MoneyText(ns.MountCost())))
+  ns.Say((L["|cff3fa9f5Level|rdon: you have the %s for riding now: visit the riding trainer."]):format(MoneyText(ns.MountCost())))
 end
 
 
@@ -1084,7 +1091,7 @@ local function Advance(initial)
         ns._acceptSkipped = ns._acceptSkipped or {}
         if not ns._acceptSkipped[s.q] then
           local _, min = ns.TooLowFor(s.q)
-          print((L["|cff3fa9f5Level|rdon: \"%s\" is not offered yet (level %d). The route goes on without it."]):format(ns.QName(s) or "?", min or 0))
+          ns.Say((L["|cff3fa9f5Level|rdon: \"%s\" is not offered yet (level %d). The route goes on without it."]):format(ns.QName(s) or "?", min or 0))
         end
         ns._acceptSkipped[s.q] = true
         cur = cur + 1
@@ -1093,7 +1100,7 @@ local function Advance(initial)
       -- (15.10., Daniel: "stay at 40") not enough gold for riding: the route goes on, a word in the chat once you have it
       if db and not db.mountLater and Level() >= 40 then
         db.mountLater = true
-        print((L["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."]):format(
+        ns.Say((L["|cff3fa9f5Level|rdon: riding costs %s, you still need %s. The route goes on on foot; Leveldon tells you when you have it."]):format(
           MoneyText(ns.MountCost()), MoneyText(ns.MountShort())))
       end
       if Level() < 40 and db then db.mountLater = true end   -- (review round 1) reached 40 later: the reminder then
@@ -1140,7 +1147,9 @@ function ns.BreadcrumbHint(s)
   return (L["  (take it along: it leads to %s)"]):format(name)
 end
 
-local function StepText(s, upcoming, short)
+-- bare (03.11.2026, Daniel on the coming steps: "brauchen wir hier wirklich, bei wem wir das als nächstes annehmen abgeben
+-- müssen?", chose "nur Quest"): a quest step only as "Accept: <quest>", the hints stay in the tooltip
+local function StepText(s, upcoming, short, bare)
   if not s then return L["Route finished"] end
   if s.k == "chapter" then return ns.ChName(s) end   -- (review round 4) going back onto the first header
   local kind = Kind(s, upcoming)
@@ -1150,6 +1159,7 @@ local function StepText(s, upcoming, short)
   if s.k == "hearth" and s.sp then return (L["Cast %s"]):format(SpellName(s.sp) or ({ [18960] = "Teleport: Moonglade" })[s.sp] or "?") end
   if s.k == "accept" or s.k == "do" or s.k == "turnin" then
     local t = verb .. ": " .. (ns.QName(s) or (L["Quest "] .. s.q))
+    if bare then return t end
     if kind == "do" and InLog(s.q) then
       -- (0.1.3, Daniel 09.10.) the game's own objectives: "2/10 Kobold Vermin slain" instead of an estimate
       -- (22.10., Daniel: "keep the main goal simple") short: the station under it lists them with their counts
@@ -1385,7 +1395,10 @@ ns.OpenQuest = function(s)
   local a = API()
   if q and IsShiftKeyDown and IsShiftKeyDown() and a and a.ShowQuestText and a.ShowQuestText(q) then return end
   if q and InLog(q) then
-    if type(QuestMapFrame_OpenToQuestDetails) == "function" and pcall(QuestMapFrame_OpenToQuestDetails, q) then return end
+    -- (02.11.2026, Daniel in Era: "click the quest passiert nichts") a client with the classic quest log (QuestLogFrame) opens
+    -- that one; QuestMapFrame_OpenToQuestDetails may exist there and do nothing
+    local classic = rawget(_G, "QuestLogFrame") ~= nil and type(QuestLog_SetSelection) == "function"
+    if not classic and type(QuestMapFrame_OpenToQuestDetails) == "function" and pcall(QuestMapFrame_OpenToQuestDetails, q) then return end
     local idx = C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(q)
     local qlf = rawget(_G, "QuestLogFrame")
     if idx and qlf and type(QuestLog_SetSelection) == "function" then
@@ -2288,7 +2301,7 @@ ns.MoveAcceptLater = function(i)
   ns._movedLater = ns._movedLater or {}
   if not ns._movedLater[s.q] then
     ns._movedLater[s.q] = true
-    print((L["|cff3fa9f5Level|rdon: \"%s\" needs level %d. It comes back when the route passes this place again."]):format(ns.QName(s) or "?", min or 0))
+    ns.Say((L["|cff3fa9f5Level|rdon: \"%s\" needs level %d. It comes back when the route passes this place again."]):format(ns.QName(s) or "?", min or 0))
   end
   return true
 end
@@ -2336,7 +2349,7 @@ local function Compose()
       end
     end
     -- (0.1.7) quests taken out of the routes after reports (Fit.lua, ns.SKIP_QUESTS)
-    local skipQ = s.q and ns.SKIP_QUESTS and ns.SKIP_QUESTS[s.q]
+    local skipQ = s.q and ((ns.SKIP_QUESTS and ns.SKIP_QUESTS[s.q]) or (ns.OtherClassQuest and ns.OtherClassQuest(s.q)))
     if not (chosen and s.sk and not chosen[s.sk]) and not soloOut and not skipQ then
       out[#out + 1] = s
       if s.k == "learn" then for _, b in ipairs(BuySteps(s, s.sk, cooking)) do out[#out + 1] = b end end
@@ -3084,7 +3097,7 @@ local function PlanBonus(root, label)
   local here, old, at = STEPS[cur], STEPS, cur
   Compose()
   cur = ns.RefindCur(here, old, at)
-  print((L["|cff3fa9f5Level|rdon: \"%s\" is in your route now, along the way."]):format(label or "?"))
+  ns.Say((L["|cff3fa9f5Level|rdon: \"%s\" is in your route now, along the way."]):format(label or "?"))
   return true
 end
 
@@ -3126,7 +3139,7 @@ local function CheckStarters()
           for j = cur + 1, #STEPS do
             if STEPS[j].q == qid and STEPS[j].k == "accept" then table.insert(STEPS, cur, table.remove(STEPS, j)) STEPS[cur]._pulled = ns._composeId break end
           end
-          print((L["|cff3fa9f5Level|rdon: lucky find, \"%s\" starts a quest chain: it is in your route now."]):format(ROUTE.bonus[qid][1].n or "?"))
+          ns.Say((L["|cff3fa9f5Level|rdon: lucky find, \"%s\" starts a quest chain: it is in your route now."]):format(ROUTE.bonus[qid][1].n or "?"))
           Update(false)
         end
       end
@@ -3147,7 +3160,7 @@ local function CheckKeep(msg)
   local link = tostring(msg):match("(|c%x+|Hitem:[^|]+|h%[[^%]]+%]|h|r)") or (L["item "] .. id)
   -- (29.10., Daniel: "wäre cool, wenn dort auch steht wie viele") how many the quest wants, behind the item
   if (tonumber(k.c) or 1) > 1 then link = link .. " 95i" .. k.c end
-  print((L["|cff3fa9f5Level|rdon: keep %s, the route needs it later for \"%s\" (bank it if your bags are full)."]):format(link, k.n or "?"))
+  ns.Say((L["|cff3fa9f5Level|rdon: keep %s, the route needs it later for \"%s\" (bank it if your bags are full)."]):format(link, k.n or "?"))
 end
 ns.CheckKeep = CheckKeep -- (tests)
 
@@ -3188,7 +3201,7 @@ do
     if #list == 0 then return nil end
     table.sort(list)
     local text = (L["|cff3fa9f5Level|rdon: do not sell %s: the route needs it later."]):format(table.concat(list, ", ", 1, math.min(#list, 5)))
-    print(text)
+    ns.Say(text)
     return text
   end
   local function OnItemTooltip(tt, data)
@@ -3211,14 +3224,14 @@ end
 local function BagCheck()
   local lines = {}
   if not CanCamp() then
-    if IsHunter() and AmmoCount() < 300 then print((L["|cff3fa9f5Level|rdon: before you go: only %d arrows or bullets."]):format(AmmoCount())) end
+    if IsHunter() and AmmoCount() < 300 then ns.Say((L["|cff3fa9f5Level|rdon: before you go: only %d arrows or bullets."]):format(AmmoCount())) end
     return
   end
   if not HasCampMaterial() then lines[#lines + 1] = L["no campfire material (Basic Campfire Kit, or Simple Wood and Flint and Tinder)"] end
   local f = FoodCount()
   if f and f < 10 then lines[#lines + 1] = (L["only %d food and drink in your bags"]):format(f) end
   if IsHunter() and AmmoCount() < 300 then lines[#lines + 1] = (L["only %d arrows or bullets"]):format(AmmoCount()) end
-  if #lines > 0 then print(L["|cff3fa9f5Level|rdon: before you go: "] .. table.concat(lines, "; ") .. ".") end
+  if #lines > 0 then ns.Say(L["|cff3fa9f5Level|rdon: before you go: "] .. table.concat(lines, "; ") .. ".") end
 end
 
 
@@ -3285,7 +3298,7 @@ function TravelTick()
             if now - dock.left < 1800 then
               LogTravel({ k = lk.k, link = i, from = dock.side, s = math.floor(now - dock.left + 0.5),
                 w = math.floor(dock.left - dock.arrived + 0.5), d = time() })
-              print((L["|cff3fa9f5Level|rdon: %s took %d s (waited %d s), noted for /lvd export."]):format(L[lk.k], now - dock.left, dock.left - dock.arrived))
+              ns.Say((L["|cff3fa9f5Level|rdon: %s took %d s (waited %d s), noted for /lvd export."]):format(L[lk.k], now - dock.left, dock.left - dock.arrived))
             end
             dock = { i = i, side = side, arrived = now, left = now }
           elseif dock and dock.i == i and dock.side == side then
@@ -3300,7 +3313,6 @@ function TravelTick()
   end
 end
 
-local exportFrame
 local function ExportText()
   local lines = { "LDX1 Leveldon travel times", ("route %s"):format(ROUTE.race or "?") }
   for _, e in ipairs(LeveldonDB and LeveldonDB.travel or {}) do
@@ -3331,45 +3343,10 @@ local function ExportText()
   for _, l in ipairs(ns.ShareExportLines and ns.ShareExportLines() or {}) do lines[#lines + 1] = l end
   return table.concat(lines, "\n")
 end
+-- (02.11.2026, StyleKit 2 step 4) DonCore's copy box (Kit.ShowCopy): the text marked, "Select all" and "Close"
 function ShowExport()
-  if not exportFrame then
-    local f = ns.CreateFrame("Frame", "LeveldonExport", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    f:SetSize(460, 300)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    if f.SetBackdrop then
-      f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-      f:SetBackdropColor(0.06, 0.07, 0.09, 0.95)
-      f:SetBackdropBorderColor(1, 1, 1, 0.08)
-    end
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", 8, -6)
-    title:SetText(Style.Wordmark("Level", "don") .. L["  export: Ctrl+A, Ctrl+C"])
-    local close = ns.CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", 2, 2)
-    local sf = ns.CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT", 8, -26)
-    sf:SetPoint("BOTTOMRIGHT", -28, 8)
-    local eb = ns.CreateFrame("EditBox", nil, sf)
-    eb:SetMultiLine(true)
-    eb:SetFontObject(ChatFontNormal or "ChatFontNormal")
-    eb:SetWidth(420)
-    eb:SetAutoFocus(false)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() f:Hide() end)
-    sf:SetScrollChild(eb)
-    f.eb = eb
-    tinsert(UISpecialFrames, "LeveldonExport")
-    exportFrame = f
-  end
-  exportFrame.eb:SetText(ExportText())
-  exportFrame:Show()
-  exportFrame.eb:SetFocus()
-  exportFrame.eb:HighlightText()
+  return ns.Kit.ShowCopy(L["Export your recordings"], L["Ctrl+A, Ctrl+C: copy it, then paste it into a comment."], ExportText(),
+    { selectAll = L["Select all"], close = L["Close"] })
 end
 ns.LeveldonExportText = ExportText -- (tests)
 end
@@ -3381,7 +3358,6 @@ end
 -- primary ones and every secondary one, and "No professions" (all profession
 -- steps left out, the choice does not come back). db.profs as before.
 ---------------------------------------------------------------------------
-local BK = Style.BOOK or {}
 -- what a profession needs when the route says nothing about it
 local PROF_NEED = {
   [171] = L["herbs (Herbalism) and vials from a trade supplies vendor"],
@@ -3455,95 +3431,33 @@ local function ApplyProfs(set, none)
     found = ns.RefindCur(here, old, at)
   end
   cur = found or math.min(at, #STEPS + 1)
-  if profsPanel then profsPanel:FadeOut() end
-  if none then print("|cff3fa9f5Level|rdon: " .. T.profsNoneSaid) end
+  if profsPanel then profsPanel:Hide() end
+  if none then ns.Say("|cff3fa9f5Level|rdon: " .. T.profsNoneSaid) end
   Update(false)
 end
 ns.ApplyProfs = ApplyProfs -- (tests)
 
--- (0.1.6, Daniel 10.10.: "overloaded") one compact row per profession: icon, name and on the right
--- "learned 45" / "picked"; what it needs and where its trainer is only in the row's tooltip.
-local function ProfRow(p, sk, kind, on, full, toggle)
-  local have = SkillRank(sk)
-  local value = have and T.profsKnown:format(have) or (on and T.profsPicked or "")
-  local row = Style.Row(p):SetMain(true)
-    :SetText(ns.PName(sk), (full and not on) and (BK.textHint or "textHint") or (BK.textPrimary or "textPrimary"))
-    :SetValue(value, on and (BK.goldLight or "good") or (BK.textHint or "textHint"))
-    :SetActive(on and true or false)
-    :SetOnClick(toggle)
-    :SetTooltip(function()
-      local need, where = ProfInfo(sk)
-      local lines = { kind }
-      if need then lines[#lines + 1] = T.profsNeeds:format(need) end
-      lines[#lines + 1] = where and T.profsTrainer:format(where) or T.profsTrainerNone
-      return ns.PName(sk), lines, (full and not on) and T.profsFullHint or T.profsClickHint
-    end)
-  local icon = ProfIcon(sk)
-  if icon then row:SetIcon(icon, false, true) end
-  return row
-end
-
--- (18.10.) a book card button: no professions on the left, done on the right, a gap between them
+-- (0.1.6, Daniel 10.10.: "overloaded") one compact row per profession: icon, name and on the right "learned 45" /
+-- "picked"; what it needs and where its trainer is only in the row's tooltip.
+-- (02.11.2026, StyleKit 2 step 4, docs/layout_2026-11-02/leveldon/) DonCore's dialog (Kit.Dialog) with a Kit.List: a line
+-- what is learned, the group heads "Primary professions 1 of 2" and "Secondary", a row per profession (a picked one marked
+-- gold); No professions and Done as the dialog's buttons (18.10., Daniel: "easy to click the wrong one": apart, the main one
+-- on the right)
+local ProfsRefresh, ShowProfs
 do
-local profsBtnBar
-local function ProfsButton(parent, text, fill, textColor, fn)
-  local b = ns.CreateFrame("Button", nil, parent)
-  local function Tex(layer, c, a)
-    local t = b:CreateTexture(nil, layer)
-    t:SetColorTexture(c[1], c[2], c[3], a or 1)
-    return t
-  end
-  local edge = BK.gold or { 0.86, 0.71, 0.42 }
-  b.border = Tex("BACKGROUND", BK.goldDark or edge)
-  b.border:SetAllPoints(b)
-  b.bg = Tex("BORDER", fill)
-  b.bg:SetPoint("TOPLEFT", b, "TOPLEFT", 1, -1)
-  b.bg:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 1)
-  b.hover = Tex("ARTWORK", { 1, 1, 1 }, 0.07)
-  b.hover:SetAllPoints(b.bg)
-  b.hover:Hide()
-  b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  b.text:SetPoint("LEFT", b, "LEFT", 6, 0)
-  b.text:SetPoint("RIGHT", b, "RIGHT", -6, 0)
-  b.text:SetJustifyH("CENTER")
-  if b.text.SetWordWrap then b.text:SetWordWrap(true) end
-  b.text:SetText(text)
-  b.text:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
-  b._onClick = fn
-  b:SetScript("OnClick", function(self) if self._onClick then self._onClick(self) end end)
-  b:SetScript("OnEnter", function(self)
-    self.hover:Show()
-    self.border:SetColorTexture(edge[1], edge[2], edge[3], 1)
-  end)
-  b:SetScript("OnLeave", function(self)
-    self.hover:Hide()
-    local d = BK.goldDark or edge
-    self.border:SetColorTexture(d[1], d[2], d[3], 1)
-  end)
-  return b
+local profsItems = {}
+local function ProfTip(row)
+  local it = row and row.item
+  local sk = it and it.sk
+  if not sk then return nil end
+  local need, where = ProfInfo(sk)
+  local lines = { it.kindText }
+  if need then lines[#lines + 1] = T.profsNeeds:format(need) end
+  lines[#lines + 1] = where and T.profsTrainer:format(where) or T.profsTrainerNone
+  return ns.PName(sk), lines, it.full and T.profsFullHint or T.profsClickHint
 end
-ns.ProfsBar = function()
-  if not profsBtnBar then
-    local f = ns.CreateFrame("Frame", nil, UIParent)
-    local none = ProfsButton(f, T.profsNone, BK.cardLow or { 0.11, 0.13, 0.28 }, BK.textSecondary or { 0.8, 0.76, 0.68 },
-      function() ApplyProfs({}, true) end)
-    local done = ProfsButton(f, T.profsDone, BK.card or { 0.17, 0.21, 0.40 }, BK.goldLight or { 0.97, 0.87, 0.60 },
-      function() ApplyProfs(picked, false) end)
-    none:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-    none:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -6, 0)
-    done:SetPoint("TOPLEFT", f, "TOP", 6, 0)
-    done:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
-    f.none, f.done = none, done
-    profsBtnBar = f
-  end
-  return profsBtnBar
-end
-ns.ProfsButtons = function() local f = ns.ProfsBar() return f.done, f.none end -- (tests)
-end
-
-local function ProfsRefresh()
+function ProfsRefresh()
   local p = profsPanel
-  p:ClearRows()
   -- (0.1.6, Daniel 10.10.: "check which are learned already") one line on top
   local have = {}
   for _, list in ipairs({ PRIMARY, SECONDARY }) do
@@ -3552,43 +3466,63 @@ local function ProfsRefresh()
       if r then have[#have + 1] = ("%s %d"):format(ns.PName(sk), r) end
     end
   end
-  Style.Row(p):SetText(#have > 0 and T.profsHave:format(table.concat(have, ", ")) or T.profsHaveNone, BK.textSecondary or "textSecondary")
+  p.intro:SetText(#have > 0 and T.profsHave:format(table.concat(have, ", ")) or T.profsHaveNone)
   local n = 0
   for _, sk in ipairs(PRIMARY) do if picked[sk] then n = n + 1 end end
-  Style.Header(p, T.profsPrimary:format(n))
-  for _, sk in ipairs(PRIMARY) do
-    ProfRow(p, sk, T.profsKindPrimary, picked[sk], n >= 2, function()
-      if picked[sk] then picked[sk] = nil elseif n < 2 then picked[sk] = true end
-      ProfsRefresh()
-    end)
+  for k = #profsItems, 1, -1 do profsItems[k] = nil end
+  local function Add(sk, kindText, full)
+    local on = picked[sk] and true or false
+    local rank = SkillRank(sk)
+    profsItems[#profsItems + 1] = { sk = sk, title = ns.PName(sk), kindText = kindText, full = full and not on, icon = ProfIcon(sk),
+      right = rank and T.profsKnown:format(rank) or (on and T.profsPicked or ""), rightColor = on and "txGold" or nil,
+      active = on, titleColor = (full and not on) and ns.Kit.C.quiet or nil, tooltipFn = ProfTip }
   end
-  Style.Header(p, T.profsSecondary):SetGapBefore(6)
-  for _, sk in ipairs(SECONDARY) do
-    ProfRow(p, sk, T.profsKindSecondary, picked[sk], false, function() picked[sk] = not picked[sk] or nil ProfsRefresh() end)
-  end
-  Style.Row(p):SetText(T.profsFoot, BK.textHint or "textHint"):SetGapBefore(4)
-  -- (18.10., Daniel: "easy to click the wrong one") the two ways out as two buttons side by side at the bottom
-  Style.Content(p, ns.ProfsBar(), 34, { gapBefore = 8 })
-  p:Relayout()
+  profsItems[#profsItems + 1] = { kind = "group", text = T.profsPrimary:format(n), static = true }
+  for _, sk in ipairs(PRIMARY) do Add(sk, T.profsKindPrimary, n >= 2) end
+  profsItems[#profsItems + 1] = { kind = "group", text = T.profsSecondary, static = true }
+  for _, sk in ipairs(SECONDARY) do Add(sk, T.profsKindSecondary, false) end
+  p.list:SetItems(profsItems)
 end
-local function ShowProfs()
+local function ProfsToggle(it)
+  local sk = it and it.sk
+  if not sk then return end
+  local n = 0
+  for _, s in ipairs(PRIMARY) do if picked[s] then n = n + 1 end end
+  local primary = false
+  for _, s in ipairs(PRIMARY) do if s == sk then primary = true end end
+  if picked[sk] then picked[sk] = nil elseif not primary or n < 2 then picked[sk] = true end
+  ProfsRefresh()
+end
+ns.ProfsItems = function() return profsItems end -- (tests)
+ns.ProfsToggle = function(sk) for _, it in ipairs(profsItems) do if it.sk == sk then ProfsToggle(it) return end end end -- (tests)
+function ShowProfs()
   if not profsPanel then
-    profsPanel = Style.Panel("LeveldonProfs", UIParent, { look = "book", media = "Interface\\AddOns\\Leveldon\\Media\\",
-      title = Style.Wordmark("Level", "don") .. T.profsTitle, width = 400, close = true,
-      defaultPoint = { "CENTER", "CENTER", 0, 80 },
-      -- (18.10., Daniel: it opened behind the options window, which is HIGH) a choice window on top
-      strata = "DIALOG" })
-    -- (0.1.6) a choice window: the route window behind it must not shine through
-    if profsPanel.SetBackgroundAlpha then profsPanel:SetBackgroundAlpha(0.97, true) end
+    local d = ns.Kit.Dialog("LeveldonProfs", { width = 400, height = 520, onLayout = function(self, w, h)
+      if not self.list then return end
+      self.intro:ClearAllPoints() self.intro:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, 0)
+      ns.Kit.Fit(self.intro, w)
+      self.list:ClearAllPoints() self.list:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, -22)
+      self.list:Resize(w, math.max(40, h - 22))
+    end })
+    d:SetTitle(L["Choose your professions"], "Interface\\Icons\\INV_Misc_Note_01")
+    d.intro = ns.Kit.Text(d.body, "sub", ns.Kit.C.muted)
+    d.list = ns.Kit.List(d.body, { zebra = false, onClick = function(it) ProfsToggle(it) end })
+    -- (18.10.) No professions on the left, Done on the right
+    d:SetButtons({ { text = T.profsNone, onClick = function() ApplyProfs({}, true) end },
+      { text = T.profsDone, kind = "primary", onClick = function() ApplyProfs(picked, false) end } })
+    profsPanel = d
   end
   picked = {}
   if db and db.profs then for sk in pairs(db.profs) do picked[sk] = true end
   else for _, sk in ipairs(PRIMARY) do if SkillRank(sk) then picked[sk] = true end end
     for _, sk in ipairs(SECONDARY) do picked[sk] = true end end
+  profsPanel:Show()
+  profsPanel:Layout()
   ProfsRefresh()
-  profsPanel:FadeIn()
+end
 end
 ns.ShowProfs = ShowProfs
+ns.ProfsButtons = function() local b = profsPanel and profsPanel.buttons or {} return b[2], b[1] end -- (tests) Done, No professions
 
 -- (0.1.6, Daniel 10.10.: "show the choice early") right after the character's first quest is accepted
 -- (once per character, out of combat, a moment later), not only at the route's choice step; closed
@@ -3634,7 +3568,7 @@ local function CheckProfsAtStart()
     local names = {}
     for _, list in ipairs({ PRIMARY, SECONDARY }) do for _, sk in ipairs(list) do if set[sk] then names[#names + 1] = ns.PName(sk) end end end
     ApplyProfs(set, false)
-    print("|cff3fa9f5Level|rdon: " .. T.profsFound:format(table.concat(names, ", ")))
+    ns.Say("|cff3fa9f5Level|rdon: " .. T.profsFound:format(table.concat(names, ", ")))
   end
 end
 ns.CheckProfsAtStart = CheckProfsAtStart -- (tests)
@@ -3652,7 +3586,7 @@ function ns.CheckLearnedProfs()
   end
   if #added == 0 then return false end
   ApplyProfs(set, false)
-  print((L["|cff3fa9f5Level|rdon: you learned %s: its steps are in your route now."]):format(table.concat(added, ", ")))
+  ns.Say((L["|cff3fa9f5Level|rdon: you learned %s: its steps are in your route now."]):format(table.concat(added, ", ")))
   return true
 end
 
@@ -3709,9 +3643,7 @@ local function LogButtonText()
 end
 local function RefreshLogButton()
   if not logButton then return end
-  logButton.label:SetText(LogButtonText())
-  local ok, w = pcall(logButton.label.GetStringWidth, logButton.label)
-  if ok and type(w) == "number" and Usable(w) and w > 0 then logButton:SetWidth(math.floor(w + 20)) end
+  logButton:SetText(LogButtonText())
 end
 local function ToggleTracker()
   if not db then return end
@@ -3739,23 +3671,12 @@ local function MakeLogButton()
     end
     return logButton
   end
-  local b = ns.CreateFrame("Button", "LeveldonTrackerButton", host, BackdropTemplateMixin and "BackdropTemplate" or nil)
-  b:SetSize(150, 20)
+  -- (02.11.2026, StyleKit 2 step 4) a small secondary button of DonCore's kit
+  local b = ns.Kit.Button(host, LogButtonText(), { small = true, onClick = ToggleTracker })
   b:SetPoint("TOPRIGHT", host, "BOTTOMRIGHT", 0, -2)
-  if b.SetBackdrop then
-    pcall(b.SetBackdrop, b, { bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-    local bg, gold = BK.header or { 0.07, 0.08, 0.17 }, BK.gold or { 0.86, 0.71, 0.42 }
-    pcall(b.SetBackdropColor, b, bg[1], bg[2], bg[3], 0.95)
-    pcall(b.SetBackdropBorderColor, b, gold[1], gold[2], gold[3], 0.8)
-  end
-  b.label = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  b.label:SetPoint("CENTER", b, "CENTER", 0, 0)
-  local tc = BK.textPrimary or { 1, 1, 1 }
-  pcall(b.label.SetTextColor, b.label, tc[1], tc[2], tc[3], 1)
-  b:SetScript("OnClick", ToggleTracker)
+  b.label = b.text
   b:SetScript("OnShow", RefreshLogButton)
-  b:SetScript("OnEnter", function(self) Style.Tooltip(self, Style.Wordmark("Level", "don"), { T.trackerTip }, "/lvd tracker") end)
-  b:SetScript("OnLeave", function(self) Style.HideTooltip(self) end)
+  b:SetTooltip("Leveldon", { T.trackerTip }, "/lvd tracker")
   b._host, b._rank = host, rank
   logButton = b
   RefreshLogButton()
@@ -3769,23 +3690,12 @@ ns.MakeLogButton = MakeLogButton -- (tests)
 local function Get(key) return db and db.panel and db.panel[key] end
 local function Set(key, value) if db then db.panel = db.panel or {} db.panel[key] = value end end
 
--- (0.1.4, Daniel 09.10.: "tidier, like Questdon's quest book") the window: the chapter as the section,
--- the step as a gold card with its icon, where it is and how far, at most three hints (the important
--- first), the next three steps with their icons, the chapter's progress as a gold bar.
-local KIND_ICON = {
-  accept = "Interface\\GossipFrame\\AvailableQuestIcon", turnin = "Interface\\GossipFrame\\ActiveQuestIcon",
-  ["do"] = "Interface\\Icons\\INV_Sword_04", grind = "Interface\\Icons\\Ability_DualWield",
-  train = "Interface\\Icons\\INV_Misc_Book_11", travel = "Interface\\Icons\\Ability_Rogue_Sprint",
-  fp = "Interface\\Icons\\INV_Misc_Map_01", bind = "Interface\\Icons\\INV_Misc_Rune_01",
-  hearth = "Interface\\Icons\\INV_Misc_Rune_01", profs = "Interface\\Icons\\INV_Misc_Note_01",
-  die = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01",
-  learn = "Interface\\Icons\\INV_Misc_Note_01", skillup = "Interface\\Icons\\INV_Misc_Note_01",
-  buy = "Interface\\Icons\\INV_Misc_Coin_01", sell = "Interface\\Icons\\INV_Misc_Coin_02",
-  use = "Interface\\Icons\\INV_Misc_Book_09", farm = "Interface\\Icons\\INV_Sword_04",
-  dungeon = "Interface\\Icons\\INV_Misc_Key_03", chapter = "Interface\\Icons\\INV_Misc_Book_09",
-}
+-- (02.11.2026, StyleKit 2 step 4) the symbol of a step's kind: DonCore's one set (Style.ICONS "step_<kind>": an atlas where
+-- the client has it, else the file; the same symbols for Questdon, Golddon, Guildon)
+local KIND_ICON = {}
+for _, k in ipairs({ "accept", "turnin", "do", "grind", "train", "travel", "fp", "bind", "hearth", "profs", "die", "learn",
+  "skillup", "buy", "sell", "use", "farm", "dungeon", "chapter", "mount" }) do KIND_ICON[k] = "step_" .. k end
 local HINT_ORDER = { warning = 1, good = 2, accent = 3, textHint = 4 }
-local B = Style.BOOK or {}
 local function ChapterProgress()
   local first, last
   for j = math.min(cur, #STEPS), 1, -1 do if STEPS[j].k == "chapter" then first = j break end end
@@ -3795,21 +3705,54 @@ local function ChapterProgress()
   return math.max(0, math.min(1, (cur - first) / (last - first)))
 end
 
+local CardFor, DoneList
+do -- (02.11.2026) the helpers of the card and the list in one block (Lua allows 200 locals in this file)
+local HINT_KIND = { warning = "warn", good = "good", accent = "accent", textHint = "text" }
+-- (02.11.2026) the second line of a step: where and at whom ("Bloodhoof  ·  Harken Windtotem"); kept with the step once the
+-- NPC's name is known (names can come a moment later), so the list asks once
+-- returns the whole line and the part without the zone (the list leaves the zone out while the place stays the same)
+local function SubLine(t)
+  if t._sub then return t._sub, t._who end
+  local where = t.m and MapName(t.m) or nil
+  local who
+  local a = API()
+  if t.k == "accept" and t.q and a and a.QuestStart then
+    local ok, _, _, _, npc = pcall(a.QuestStart, t.q)
+    who = ok and npc or nil
+  elseif t.k == "turnin" and t.q and a and a.TurnInNpc then
+    local ok, _, name = pcall(a.TurnInNpc, t.q)
+    who = ok and name or nil
+  elseif t.k == "buy" then who = t.v
+  elseif t.k == "sell" or t.k == "fp" or t.k == "bind" or t.k == "train" then who = t.n
+  elseif (t.k == "do" or t.k == "grind") and t.kills then who = (L["about %d mobs"]):format(t.kills) end
+  if who == "" then who = nil end
+  local s = (where and who) and (where .. "  ·  " .. who) or where or who or ""
+  if who or not (t.k == "accept" or t.k == "turnin") then t._sub, t._who = s, who end
+  return s, who
+end
+ns.LvdSubLine = SubLine -- (tests)
+
+local function YardsTo(t)
+  local a = API()
+  if not (t and t.m and t.x and a and a.DistanceTo) then return nil end
+  local ok, d = pcall(a.DistanceTo, t.m, t.x / 100, t.y / 100)
+  if not (ok and type(d) == "number" and Usable(d)) then return nil end
+  return (L["%d yd"]):format(math.floor(d + 0.5))
+end
+
 -- (21.10., Daniel: "the step list scrollable, in two parts") what StepList.lua (ns.LvdList) reads of the route: the
 -- helpers Refresh uses, handed over once (a do block: Lua allows 200 locals in this file)
-do
-  ns.LvdListCtx = {
+ns.LvdListCtx = {
     state = function() return STEPS, cur end,
     done = StepDone, outgrown = Outgrown, kind = Kind, text = StepText, place = Place,
-    icon = KIND_ICON, level = Level, inLog = InLog,
+    icon = KIND_ICON, level = Level, inLog = InLog, sub = SubLine, yards = YardsTo,
     chapterName = function(n) return ns.ChName(n) end,
     buyWaits = function(j) return ns.BuyWaits ~= nil and ns.BuyWaits(j) end,
     open = function(n) ns.OpenQuest(n) end,
+    menu = function(n) ns.SM.Show(n) end,
   }
-end
 
 -- (0.1.8, Daniel 12.10.: "the chapter path with the compass in the current station and the speedrun line")
--- Window.lua (ns.LvdWin) draws the new parts; without it the window is built as before.
 function ns.LvdObjList(q)
   local out = {}
   local ok, objs = pcall(C_QuestLog and C_QuestLog.GetQuestObjectives or function() end, q)
@@ -3820,6 +3763,94 @@ function ns.LvdObjList(q)
   end
   return out
 end
+
+-- (02.11.2026) an objective on the card: the count stands on the right, so it leaves the text ("3/8 Wolf slain",
+-- "Wolf slain: 3/8")
+local function ObjText(o)
+  local t = o.text or ""
+  if (o.need or 0) > 1 then t = t:gsub("^%d+%s*/%s*%d+%s+", ""):gsub(":%s*%d+%s*/%s*%d+%s*$", "") end
+  return t
+end
+ns.LvdObjText = ObjText -- (tests)
+local function Along(title, objs)
+  local right
+  for _, o in ipairs(objs or {}) do
+    if not o.done and (o.need or 0) > 1 then right = ("%d/%d"):format(math.min(o.have or 0, o.need), o.need) break end
+  end
+  return { text = (L["Along here: %s"]):format(title or "?"), right = right }
+end
+local function QuestTitle(q)
+  return C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(q) or (L["Quest "] .. q)
+end
+
+-- (02.11.2026, StyleKit 2 step 4) what the card shows of the step you are on (Window.lua W.Card)
+-- the last two finished steps (the older one on top), nil: none
+local doneItems, doneOne = { {}, {} }, {}
+function DoneList()
+  local nd = 0
+  for j = cur - 1, math.max(1, cur - 40), -1 do
+    local t = STEPS[j]
+    if t and t.k ~= "chapter" and StepDone(j) then
+      nd = nd + 1
+      doneItems[nd].title = StepText(t, true, true)
+      if nd >= 2 then break end
+    end
+  end
+  if nd == 0 then return nil end
+  if nd == 1 then doneOne[1] = doneItems[1] return doneOne end
+  doneItems[1], doneItems[2] = doneItems[2], doneItems[1]
+  return doneItems
+end
+
+function CardFor(s, chStep)
+  local kind = Kind(s)
+  local m, x, y = Place(cur)
+  if s.k == "die" and s.gm and s.gx and not ns.DieWalkFirst(s) then m, x, y = s.gm, s.gx, s.gy end -- (12.10.) the spirit healer
+  -- (0.1.4) a do step: the place the arrow points at (the nearest open one), not the planned one
+  if kind == "do" and InLog(s.q) then
+    local p = NearestObjective(s.q)
+    if p then m, x, y = p.mapID, p.x * 100, p.y * 100 end
+  end
+  local text = StepText(s, nil, true)
+  local verb = VERB[kind]
+  local title = text
+  if verb and text:sub(1, #verb + 2) == verb .. ": " then title = text:sub(#verb + 3) end
+  local kicker = (L["Step %d"]):format(chStep or cur) .. (verb and ("  ·  " .. verb) or "")
+    .. ((tonumber(s.lv) and IsQuestStep(s)) and ("  ·  [" .. s.lv .. "]") or "")
+  local d = { iconKind = KIND_ICON[kind] or KIND_ICON.chapter, kicker = kicker, title = title, objectives = {}, subs = {}, hints = {} }
+  if s.q and InLog(s.q) and (kind == "do" or kind == "turnin") then
+    for k, o in ipairs(ns.LvdObjList(s.q)) do
+      if k > 4 then break end
+      d.objectives[k] = { text = ObjText(o), have = o.have, need = o.need, done = o.done }
+    end
+  end
+  if m then d.way = { text = ("%s  ·  %.1f, %.1f"):format(MapName(m), x, y), m = m, x = x, y = y } end
+  -- (Daniel 12.10.) a quest to do along here, (21.10.) and the other quests with open objectives right here
+  -- (22.10., Daniel: "turning in at the hub, 'along here' kill the mobs is disturbing") only while the step is out doing quests
+  if (kind == "do" or s.k == "grind") and AlongHere(s) and ns._alongQ then
+    d.subs[1] = Along(QuestTitle(ns._alongQ), ns.LvdObjList(ns._alongQ))
+    for k, q2 in ipairs(ns._alongMore or {}) do
+      if k > 2 then break end
+      d.subs[#d.subs + 1] = Along(QuestTitle(q2), ns.LvdObjList(q2))
+    end
+  end
+  -- hints: the important first, three at most
+  local hints = Hints(s)
+  table.sort(hints, function(a, b) return (HINT_ORDER[a[2]] or 5) < (HINT_ORDER[b[2]] or 5) end)
+  for k = 1, math.min(3, #hints) do d.hints[k] = { text = hints[k][1], kind = HINT_KIND[hints[k][2]] or "text" } end
+  -- (0.2.3) right click: the step menu; the profession choice: its window; a quest: the quest log (Shift: the whole text)
+  d.onClick = function(_, button)
+    if button == "RightButton" then ns.SM.Show(s)
+    elseif s.k == "profs" then ShowProfs()
+    elseif s.q then ns.OpenQuest(s) end
+  end
+  d.tooltipFn = function()
+    return StepText(s), nil, s.q and L["Click: the quest  ·  Shift-click: read it  ·  Right-click: more"] or L["Right-click: more"]
+  end
+  return d
+end
+end
+
 local function Refresh()
   if not panel then return end
   -- (31.10.2026, Leistungsprüfung B7: the window was built while hidden, about 60 KB a build) hidden: only marked,
@@ -3833,107 +3864,37 @@ local function Refresh()
   if ns.LF.TickReset then ns.LF.TickReset() end -- (17.10.) any build counts as fresh for the ticker
   panel:ClearRows()
   local Win = ns.LvdWin
-  if Win then Win.Begin(panel) pcall(Win.Run, panel, STEPS, cur) end
-  local ch = ChapterOf(math.min(cur, #STEPS))
+  local width = (panel._width or 360) - 2 * Win.INSET
+  pcall(Win.Run, panel, STEPS, cur, width)
+  local ch, c0 = ChapterOf(math.min(cur, #STEPS))
+  local chStep
   if ch then
     local plan
     for j = cur - 1, 1, -1 do if STEPS[j] and STEPS[j].el then plan = STEPS[j].el break end end
     -- (22.10., Daniel: "not the steps in total but the steps in the zone") step n of the chapter's steps
-    local _, c0 = ChapterOf(math.min(cur, #STEPS))
     local c1 = #STEPS
     c0 = c0 or 1
     for j = c0 + 1, #STEPS do if STEPS[j].k == "chapter" then c1 = j - 1 break end end
-    if not (Win and pcall(Win.Banner, panel, ns.ChName(ch), ch.lo, ch.hi, math.max(1, math.min(cur, #STEPS) - c0), math.max(1, c1 - c0), ChapterProgress(), plan, (panel._width or 360) - 2)) then
-      Style.Header(panel, (L["%s  ·  level %d to %d"]):format(ns.ChName(ch), ch.lo or 0, ch.hi or 0))
-    end
-    if ch._pv then
-      Style.Row(panel):SetText(L["Preview: this part of the route is not tested yet."], B.textSecondary or "textSecondary")
-    end
+    chStep = math.max(1, math.min(cur, #STEPS) - c0)
+    pcall(Win.Head, panel, { name = ns.ChName(ch), lo = ch.lo, hi = ch.hi, step = chStep, total = math.max(1, c1 - c0),
+      progress = ChapterProgress(), plan = plan }, width)
+    if ch._pv then pcall(Win.Note, panel, L["Preview: this part of the route is not tested yet."], "warn", width) end
   end
-  -- (Daniel 12.10.: "the done steps from before up top are too much") no stations behind you any more
+  -- (02.11.2026, mockup) the last two finished steps, dimmed
+  local done = DoneList()
+  if done then pcall(Win.Done, panel, done, width) end
   local s = STEPS[cur]
-  local kind = Kind(s)
-  local main = Style.Row(panel):SetMain(true):SetActive(true):SetText(StepText(s, nil, Win and true or nil), B.textPrimary or "textPrimary")
-  main:SetIcon(s and KIND_ICON[kind] or KIND_ICON.chapter, false, kind ~= "accept" and kind ~= "turnin" or nil)
-  -- (0.2.3) right-click: the menu with skip this step, skip this quest
-  local left = s and s.k == "profs" and ShowProfs or (s and s.q and function() ns.OpenQuest(s) end) or nil
-  main:SetOnClick(s and function(self, button)
-    if button == "RightButton" then ns.SM.Show() elseif left then left(self, button) end
-  end or nil)
-  if Win then Win.Line(main, "now") pcall(Win.Now, main) end
-  local m, x, y = Place(cur)
-  if s and s.k == "die" and s.gm and s.gx and not ns.DieWalkFirst(s) then m, x, y = s.gm, s.gx, s.gy end -- (12.10.) the spirit healer
-  -- (0.1.4) a do step: the place the arrow points at (the nearest open one), not the planned one
-  if s and kind == "do" and InLog(s.q) then
-    local p = NearestObjective(s.q)
-    if p then m, x, y = p.mapID, p.x * 100, p.y * 100 end
+  if s then
+    pcall(Win.Card, panel, CardFor(s, chStep), width)
+  else
+    pcall(Win.Note, panel, L["Route finished"], "good", width)
   end
-  local stationDone = false
-  if Win and s then
-    local where = m and ("%s  ·  %.1f, %.1f"):format(MapName(m), x, y) or nil
-    local objs = (s.q and InLog(s.q) and (kind == "do" or kind == "turnin")) and ns.LvdObjList(s.q) or {}
-    -- (Daniel 12.10.) a quest to do along here: in the station, as large as the step's own objectives
-    local along
-    -- (22.10., Daniel: "turning in at the hub, 'along here' kill the mobs is disturbing: first turn in, accept, sell,
-    -- then off to the quests") the quests along here only while the step itself is out doing quests
-    if (kind == "do" or s.k == "grind") and AlongHere(s) and ns._alongQ then
-      along = { title = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(ns._alongQ) or (L["Quest "] .. ns._alongQ),
-        objs = ns.LvdObjList(ns._alongQ) }
-      -- (21.10.) and the other quests with open objectives right here, below it
-      for _, q2 in ipairs(ns._alongMore or {}) do
-        along.more = along.more or {}
-        along.more[#along.more + 1] = { title = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(q2) or (L["Quest "] .. q2),
-          objs = ns.LvdObjList(q2) }
-      end
-    end
-    stationDone = pcall(Win.Station, panel, objs, where, (panel._width or 360) - 2, along)
-  end
-  if s and m and not stationDone then
-    local where = ("%s  ·  %.1f, %.1f"):format(MapName(m), x, y)
-    local a = API()
-    local d = a and a.DistanceTo and a.DistanceTo(m, x / 100, y / 100)
-    local row = Style.Row(panel):SetText(where, B.textSecondary or "textSecondary"):SetIndent(18)
-    if type(d) == "number" then row:SetValue((L["%d yd"]):format(math.floor(d + 0.5)), B.goldLight or "accent") end
-  end
-  -- hints: the important first, three at most ("kill the mobs on your way" only when there is room)
-  local hints = Hints(s)
-  table.sort(hints, function(a, b) return (HINT_ORDER[a[2]] or 5) < (HINT_ORDER[b[2]] or 5) end)
-  for k = 1, math.min(3, #hints) do
-    local h = hints[k]
-    Style.Row(panel):SetText(h[1], h[2] == "textHint" and (B.textHint or "textHint") or h[2]):SetIndent(18):SetGapBefore(k == 1 and 4 or nil)
-  end
-  local shown = 0
-  -- (21.10., Daniel: "scrollable with a slider", "two parts") the area rows and the coming steps as one scrollable
-  -- block (StepList.lua); the plain list below stays as the fallback
-  local listed = false
-  if Win and ns.LvdList and ns.LvdListCtx then
-    local okL, did = pcall(ns.LvdList.Build, panel, ns.LvdListCtx, (panel._width or 360) - 2)
-    listed = okL and did == true
-  end
-  -- (0.1.8) the next level the plan reaches on the way: a gold diamond on the path
-  local nextLv = Level() + 1
-  for j = cur + 1, listed and cur or #STEPS do
-    local n = STEPS[j]
-    local isCh = n.k == "chapter"
-    -- (playtest 1) a buy without the money is not "next": it waits (see the hint)
-    if isCh or (not StepDone(j) and not Outgrown(n) and not (n.k == "buy" and ns.BuyWaits(j))) then
-      if shown == 0 and not Win then Style.Header(panel, L["Next"]) end
-      local prevEl
-      for k = j - 1, cur, -1 do if STEPS[k] and STEPS[k].el then prevEl = STEPS[k].el break end end
-      if Win and prevEl and prevEl >= nextLv then Win.Milestone(panel, nextLv) nextLv = math.floor(prevEl) + 1 end
-      local row = Style.Row(panel):SetText(isCh and (L["Chapter: "] .. ns.ChName(n)) or StepText(n, true), B.textHint or "textHint")
-        :SetIcon(KIND_ICON[isCh and "chapter" or Kind(n, true)] or KIND_ICON.chapter, false, not (n.k == "accept" or n.k == "turnin") or nil)
-        :SetOnClick(n.q and function() ns.OpenQuest(n) end or nil)
-      if Win then Win.Line(row, "next") end
-      shown = shown + 1
-      if shown >= (ns.nextShown or NEXT_SHOWN) then break end -- (0.1.7) more with a taller window (Resize.lua)
-    end
-  end
-  local foot = Style.Row(panel):SetText((L["Step %d of %d"]):format(math.min(cur, #STEPS), #STEPS), B.textHint or "textHint")
-    :SetValue((L["chapter %d%%"]):format(math.floor(ChapterProgress() * 100 + 0.5)), B.gold or "textSecondary"):SetGapBefore(6)
-  Style.Bar(foot, { height = 3, segments = { { key = "value", color = B.gold or "accent", value = ChapterProgress() } } })
+  -- (21.10., Daniel: "scrollable with a slider", "two parts") the coming steps as one block (StepList.lua): the rest of
+  -- the window's height
+  pcall(ns.LvdList.Build, panel, ns.LvdListCtx, width)
+  pcall(Win.Foot, panel, math.min(cur, #STEPS), #STEPS, ChapterProgress(), width)
   panel:Relayout()
-  if Win then pcall(Win.Finish, panel) end
+  pcall(Win.Finish, panel)
 end
 
 local arrowStep, arrowKey
@@ -4008,7 +3969,7 @@ function ns.LF.ClassNow()
   ns._classNowSaid = ns._classNowSaid or {}
   if not ns._classNowSaid[moved[1].q] then
     ns._classNowSaid[moved[1].q] = true
-    print((L["|cff3fa9f5Level|rdon: level %d: \"%s\" comes next (your class quest)."]):format(tonumber(g1.minLevel) or Level(), ns.QName(moved[1]) or "?"))
+    ns.Say((L["|cff3fa9f5Level|rdon: level %d: \"%s\" comes next (your class quest)."]):format(tonumber(g1.minLevel) or Level(), ns.QName(moved[1]) or "?"))
   end
   if ns.RecEvent then pcall(ns.RecEvent, "C", moved[1].q, at) end
   return true
@@ -4071,7 +4032,7 @@ function ns.LF.FollowPlayer()
   for _, t in ipairs(keep) do if t.k ~= "bind" then n2 = n2 + 1 table.insert(STEPS, to + n2, t) end end
   cur = to
   ns.SaveStep()
-  print((L["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."]):format(STEPS[cur] and (ns.QName(STEPS[cur]) or STEPS[cur].n) or "?"))
+  ns.Say((L["|cff3fa9f5Level|rdon: you are ahead on the route; it goes on at \"%s\"."]):format(STEPS[cur] and (ns.QName(STEPS[cur]) or STEPS[cur].n) or "?"))
   ns.LF.seen, ns.LF.since, ns.LF.recent = STEPS[cur], Now(), {}
   return true
 end
@@ -4282,14 +4243,18 @@ ns.LeveldonSkipStep = function(obj)
   end
 end -- (0.1.7 Report.lua: after a report the next step)
 
--- (0.2.3, Daniel 13.10.: "right-click on the current quest with the option skip") a small menu on the current
--- step: skip this step (as the arrow button), or skip the whole quest: all its steps go by (taking, doing, handing
--- in, buying for it), kept per character in db.skipQ; a step back onto one of its steps brings the quest back
+-- (0.2.3, Daniel 13.10.: "right-click on the current quest with the option skip") a small menu on a step: skip this step
+-- (as the arrow button), or skip the whole quest: all its steps go by (taking, doing, handing in, buying for it), kept per
+-- character in db.skipQ; a step back onto one of its steps brings the quest back. (02.11.2026, StyleKit 2 step 4) DonCore's
+-- menu (Kit.Menu) on the card and on every coming step; on the step you are on also "report" and "read" (under 300 px they
+-- are not up top, Daniel 02.11.)
 ns.SM = {}
-function ns.SM.Action(what)
-  local s = STEPS[cur]
+-- what: "step" | "quest"; s: the step (default the one you are on)
+function ns.SM.Action(what, s)
+  s = s or STEPS[cur]
+  local here = s == STEPS[cur]
   if what == "step" then
-    Skip(1)
+    if here then Skip(1) elseif s then ns.LeveldonSkipStep(s) end
   elseif what == "quest" and s and s.q and db then
     db.skipQ = db.skipQ or {}
     db.skipQ[s.q] = true
@@ -4304,107 +4269,62 @@ function ns.SM.Action(what)
     pcall(MarkTick)
     Refresh()
   end
-  if ns.SM.menu then ns.SM.menu:Hide() end
+  if ns.Kit then ns.Kit.Menu.Hide() end
 end
-function ns.SM.Row(parent)
-  local r = ns.CreateFrame("Button", nil, parent)
-  r:SetHeight(22)
-  r.hover = r:CreateTexture(nil, "BACKGROUND")
-  r.hover:SetAllPoints(r)
-  r.hover:SetColorTexture(1, 1, 1, 0.07)
-  r.hover:Hide()
-  r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  r.text:SetPoint("LEFT", r, "LEFT", 8, 0)
-  r.text:SetPoint("RIGHT", r, "RIGHT", -4, 0)
-  r.text:SetJustifyH("LEFT")
-  r:SetScript("OnEnter", function(self) self.hover:Show() end)
-  r:SetScript("OnLeave", function(self) self.hover:Hide() end)
-  return r
+function ns.SM.Read(s)
+  local a = API()
+  if s and s.q and a and a.ShowQuestText then a.ShowQuestText(s.q) end
 end
-function ns.SM.Show()
-  local s = STEPS[cur]
-  if not s then return end
-  local m = ns.SM.menu
-  if not m then
-    local c = ns.CreateFrame("Button", nil, UIParent)
-    c:SetAllPoints(UIParent)
-    c:SetFrameStrata("DIALOG")
-    if c.RegisterForClicks then c:RegisterForClicks("AnyUp") end
-    c:SetScript("OnClick", function() if ns.SM.menu then ns.SM.menu:Hide() end end)
-    m = ns.CreateFrame("Frame", "LeveldonStepMenu", UIParent)
-    m.catcher = c
-    m:SetFrameStrata("DIALOG")
-    local lvl = c.GetFrameLevel and tonumber(c:GetFrameLevel())
-    if lvl and m.SetFrameLevel then m:SetFrameLevel(lvl + 10) end
-    m:SetWidth(220)
-    m:EnableMouse(true)
-    m:SetClampedToScreen(true)
-    local bg = m:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(m)
-    bg:SetColorTexture(0.10, 0.11, 0.22, 0.97)
-    m.title = m:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    m.title:SetPoint("TOPLEFT", m, "TOPLEFT", 10, -8)
-    m.title:SetPoint("RIGHT", m, "RIGHT", -10, 0)
-    m.title:SetJustifyH("LEFT")
-    m.rows = { ns.SM.Row(m), ns.SM.Row(m) }
-    for k, r in ipairs(m.rows) do
-      local above = k == 1 and m.title or m.rows[k - 1]
-      local dy = k == 1 and -6 or 0
-      r:SetPoint("TOPLEFT", above, "BOTTOMLEFT", k == 1 and -6 or 0, dy)
-      r:SetPoint("RIGHT", m, "RIGHT", -4, 0)
-    end
-    if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "LeveldonStepMenu") end
-    m:SetScript("OnHide", function(self) self.catcher:Hide() end)
-    ns.SM.menu = m
-  end
-  m.title:SetText(StepText(s))
-  local items = { { "step", L["Skip this step"] } }
-  if s.q then items[2] = { "quest", L["Skip this quest"] } end
-  for k, r in ipairs(m.rows) do
-    local it = items[k]
-    if it then
-      r.text:SetText(it[2])
-      r:SetScript("OnClick", function() ns.SM.Action(it[1]) end)
-      r:Show()
-    else
-      r:Hide()
-    end
-  end
-  m.items = #items
-  local th = m.title.GetStringHeight and tonumber(m.title:GetStringHeight()) or 14
-  if not th or th < 12 then th = 14 end
-  m:SetHeight(8 + th + 6 + #items * 22 + 8)
-  if GameTooltip and GameTooltip.Hide then GameTooltip:Hide() end
-  local x, y = 0, 0
-  if GetCursorPosition then x, y = GetCursorPosition() end
-  local sc = UIParent.GetEffectiveScale and tonumber(UIParent:GetEffectiveScale()) or 1
-  m:ClearAllPoints()
-  m:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (x or 0) / sc - 8, (y or 0) / sc + 8)
-  m.catcher:Show()
-  m:Show()
+function ns.SM.Show(s)
+  s = s or STEPS[cur]
+  if not (s and ns.Kit) then return end
+  local here = s == STEPS[cur]
+  local items = { { text = L["Skip this step"], onClick = function() ns.SM.Action("step", s) end } }
+  if s.q then items[#items + 1] = { text = L["Skip this quest"], onClick = function() ns.SM.Action("quest", s) end } end
+  if here then items[#items + 1] = { text = L["Report this step"], onClick = function() if ns.OpenReport then ns.OpenReport() end end } end
+  if s.q then items[#items + 1] = { text = L["Read the whole quest"], onClick = function() ns.SM.Read(s) end } end
+  ns.SM.items = items -- (tests)
+  return ns.Kit.Menu(s.k == "chapter" and ns.ChName(s) or StepText(s, not here, true), items)
 end
 local function Build()
+  -- (02.11.2026, StyleKit 2 step 4, Daniel: "Questdon passt, starte die umbauten") the Don look like Questdon's quest list:
+  -- 28 px head with the mark, gold frame; the buttons from left to right: cog, back, forward, report, read, fold, close.
+  -- Under 300 px report and read are not up top (minWidth; both in the step's right-click menu, read also by Shift-click)
   panel = Style.Panel("LeveldonPanel", UIParent, {
-    look = "book", media = "Interface\\AddOns\\Leveldon\\Media\\",
-    title = Style.Wordmark("Level", "don") .. L["  |cff8a8f99beta "] .. VERSION .. "|r",
+    look = "don", logo = "Interface\\Icons\\INV_Misc_Book_09",
+    title = "LEVELDON", -- (03.11.2026, Daniel: "oben das beta 0.2.9 kann weg"; the version stays in the addon list)
     width = 360, close = true, collapse = true, get = Get, set = Set,
     defaultPoint = { "TOPRIGHT", "TOPRIGHT", -260, -260 },
     buttons = {
-      -- (17.10., Daniel: "the options menu in Questdon's look") the options window (Options.lua), as Questdon's cog
-      { kind = "options", key = "options", onClick = function() if ns.ToggleOptions then ns.ToggleOptions() end end,
-        tooltip = { L["Options"], nil, "/lvd options" } },
-      { kind = "forward", key = "next", onClick = function() Skip(1) end, tooltip = { L["Skip this step"], { L["Right-click the step: skip it or the whole quest."] }, "/lvd next" } },
-      { kind = "back", key = "back", onClick = function() Skip(-1) end, tooltip = { L["One step back"], nil, "/lvd back" } },
-      -- (0.1.7, Daniel 11.10.) report this step: quest giver not there, route makes no sense, a remark
-      { kind = "report", key = "report", onClick = function() if ns.OpenReport then ns.OpenReport() end end,
-        tooltip = { L["Report this step"], { L["Quest giver not there, route makes no sense, or a remark."] }, "/lvd report" } },
       -- (0.1.8, Daniel 12.10.) the whole quest to read (17.10.: the stopwatch button is gone)
-      { kind = "lvdRead", key = "read", onClick = function()
+      { kind = "read", key = "read", minWidth = 300, onClick = function()
           local st, a = STEPS[cur], API()
           if st and st.q and a and a.ShowQuestText then a.ShowQuestText(st.q) end
         end, tooltip = { L["Read the whole quest"], nil, L["Shift-click a step: the same."] } },
+      -- (0.1.7, Daniel 11.10.) report this step: quest giver not there, route makes no sense, a remark
+      { kind = "report", key = "report", minWidth = 300, onClick = function() if ns.OpenReport then ns.OpenReport() end end,
+        tooltip = { L["Report this step"], { L["Quest giver not there, route makes no sense, or a remark."] }, "/lvd report" } },
+      { kind = "forward", key = "next", onClick = function() Skip(1) end, tooltip = { L["Skip this step"], { L["Right-click the step: skip it or the whole quest."] }, "/lvd next" } },
+      { kind = "back", key = "back", onClick = function() Skip(-1) end, tooltip = { L["One step back"], nil, "/lvd back" } },
+      -- (17.10., Daniel: "the options menu in Questdon's look") (01.11.2026, Daniel: "gleiche symbole aus dem gleichen kit")
+      -- the cog of every Don addon: Style.Panel takes symbol, click and tooltip from DonCore's Options (donOptions)
+      { key = "options", donOptions = "Leveldon", hint = "/lvd options" },
     },
   })
+  -- (03.11.2026, Daniel: "übertrieben groß alles", chose "gemeinsamer Maßstab") the window under DonCore's shared scale
+  -- (Kit.scale, the options' "General" page) like every Don window; Size (Ctrl + wheel) is its own factor on top
+  local Kit = ns.Kit
+  if Kit and Kit.Scaled and panel.SetPanelScale then
+    local setPanelScale = panel.SetPanelScale
+    panel.SetPanelScale = function(self, v, silent)
+      setPanelScale(self, v, silent)
+      self._ownScale = self._scale or 1
+      Kit.Scaled(self)
+      return self
+    end
+    panel._ownScale = panel._scale or 1
+    Kit.Scaled(panel)
+  end
   -- (31.10.2026, B7) built when it shows again after changes while hidden; hidden: Questdon's compass and dock off
   local onShow, onHide = panel:GetScript("OnShow"), panel:GetScript("OnHide")
   panel:SetScript("OnShow", function(self, ...)
@@ -4478,6 +4398,12 @@ f:SetScript("OnEvent", function(_, event, ...)
     if ... ~= addonName then if db then pcall(MakeLogButton) end return end
     LeveldonCharDB = LeveldonCharDB or {}
     db = LeveldonCharDB
+    -- (03.11.2026, Daniel: "size 100% auf standard beim starten", chose "einmal zurücksetzen"; then "übertrieben groß alles",
+    -- chose the shared scale and 3 coming steps) size and height once back to the defaults (Resize.lua: 100 %, 330)
+    if type(db.panel) == "table" and not db.panel.scale1103b then
+      db.panel.scale, db.panel.h, db.panel.scale1103, db.panel.scale1103b = nil, nil, nil, true
+    end
+    if type(db.panel) == "table" and not db.panel.h1103c then db.panel.h, db.panel.h1103c = nil, true end -- the 264 once
   elseif event == "PLAYER_LOGIN" then
     -- (12.10., Daniel: "the clock says 1:18, I have played 32 min") a new character with the name of a deleted one
     -- gets the old one's saved data (the game keeps it by name): with another character ID all but the window go

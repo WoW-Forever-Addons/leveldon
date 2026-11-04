@@ -12,7 +12,6 @@ local Style = ns.Style
 -- choice is saved per character (LeveldonCharDB.line) and can change in the middle of the route:
 -- ns.SetLine -> ns.ReloadRoute goes on with the same step or the first unfinished one.
 ---------------------------------------------------------------------------
-local BK = Style.BOOK or {}
 local FACTION_NAME = { [72] = "Stormwind", [47] = "Ironforge", [54] = "Gnomeregan", [69] = "Darnassus",
   [76] = "Orgrimmar", [81] = "Thunder Bluff", [68] = "Undercity", [530] = "Darkspear" }
 -- the standings of the game: from this much reputation on (Neutral 0, Friendly 3000, Honored 9000, Revered 21000, Exalted 42000)
@@ -68,58 +67,86 @@ local function RepLines(info)
 end
 ns.LineRepLines = RepLines -- (tests)
 
-local panel
+local Kit = ns.Kit
+local dlg, picked
 local function Hours(info) return (LeveldonCharDB and LeveldonCharDB.dungeons and (info.hd or 0) > 0) and info.hd or info.h end
 
-local function Refresh()
-  if not panel then return end
+-- (02.11.2026, StyleKit 2 step 4, docs/layout_2026-11-02/leveldon/) DonCore's dialog (Kit.Dialog): a line on top, the
+-- routes as list rows with a choice point (hours and quests on the right, the reputation in the tooltip), the hint
+-- below, Cancel and Take it; a click picks, "Take it" sets the route
+local function Rows()
   local list, current = ns.LineChoices()
-  panel:ClearRows()
-  if not list then
-    Style.Row(panel):SetText(L["No other start areas for this character yet."], BK.textSecondary or "textSecondary")
-    panel:Relayout()
-    return
-  end
-  Style.Row(panel):SetText(L["Your race starts in its own area. From there the route can go on through the start area of another race of your faction: other quests, other hours, other reputation."],
-    BK.textSecondary or "textSecondary")
-  Style.Header(panel, L["Route for levels 1 to 30"])
+  local items = {}
+  if not list then return items, nil end
+  local faction = UnitFactionGroup and select(2, UnitFactionGroup("player")) or ""
+  items[1] = { kind = "group", text = L["Route for levels 1 to 30"], static = true, right = faction }
   for _, e in ipairs(list) do
-    local info = e.info
-    local on = e.key == current
-    local title = ns.LineTitle(e.key)
-    local row = Style.Row(panel):SetMain(true)
-      :SetText(e.own and (L["%s (your own)"]):format(title) or title, BK.textPrimary or "textPrimary")
-      :SetValue((L["%.1f h"]):format(Hours(info)), on and (BK.goldLight or "good") or (BK.textHint or "textHint"))
-      :SetActive(on)
-      :SetOnClick(function() ns.SetLine(e.key) end)
-      :SetTooltip(function()
+    local info, key = e.info, e.key
+    local title = ns.LineTitle(key)
+    local rep = RepLines(info)
+    items[#items + 1] = { title = e.own and (L["%s (your own)"]):format(title) or title, sub = rep[1] or "",
+      radio = key == (picked or current), active = key == (picked or current), key = key, rightWidth = 110,
+      right = (L["%.1f h"]):format(Hours(info)) .. "  ·  " .. (L["%d quests"]):format(info.q),
+      tooltipFn = function()
         local lines = { (L["About %.1f hours, %d quests handed in"]):format(info.h, info.q) }
         if (info.hd or 0) > 0 then lines[#lines + 1] = (L["With dungeons: about %.1f hours"]):format(info.hd) end
-        for _, t in ipairs(RepLines(info)) do lines[#lines + 1] = t end
-        return title, lines, on and L["This is your route."] or L["Click: take this route from here on"]
-      end)
-    local rep = RepLines(info)
-    Style.Row(panel):SetText((L["%d quests"]):format(info.q) .. (rep[1] and (", " .. rep[1]) or "") .. (rep[2] and (", " .. rep[2]) or ""),
-      BK.textHint or "textHint")
+        for _, t in ipairs(rep) do lines[#lines + 1] = t end
+        return title, lines, key == current and L["This is your route."] or L["Click: take this route from here on"]
+      end }
   end
-  Style.Row(panel):SetText(L["You can change it in the middle of the route: Leveldon goes on with the same step, or the first one you have not done yet. Levels 30 to 60 stay the same."],
-    BK.textHint or "textHint"):SetGapBefore(6)
-  panel:Relayout()
+  return items, current
+end
+
+local function Refresh()
+  if not dlg then return end
+  local items, current = Rows()
+  if #items == 0 then
+    dlg.intro:SetText(L["No other start areas for this character yet."])
+    dlg.list:SetItems({})
+  else
+    dlg.intro:SetText(L["Your race starts in its own area. From there the route can go on through the start area of another race of your faction: other quests, other hours, other reputation."])
+    dlg.list:SetItems(items)
+  end
+  dlg.current = current
+  dlg:SetButtons({ { text = L["Cancel"], onClick = function(d) d:Hide() end },
+    { text = L["Take it"], kind = "primary", disabled = not picked or picked == current, onClick = function(d)
+      if picked and picked ~= current then ns.SetLine(picked) end
+      d:Hide()
+    end } })
 end
 ns.LineRefresh = Refresh
 
-function ns.ShowLines()
-  if not panel then
-    panel = Style.Panel("LeveldonLines", UIParent, { look = "book", media = "Interface\\AddOns\\Leveldon\\Media\\",
-      title = Style.Wordmark("Level", "don") .. L["  route"], width = 460, close = true,
-      defaultPoint = { "CENTER", "CENTER", 0, 80 }, strata = "DIALOG" })
-    if panel.SetBackgroundAlpha then panel:SetBackgroundAlpha(0.97, true) end
-  end
-  Refresh()
-  panel:FadeIn()
-  return panel
+local function Create()
+  local d = Kit.Dialog("LeveldonLines", { width = 460, height = 340, onLayout = function(self, w, h)
+    if not self.list then return end
+    self.intro:ClearAllPoints() self.intro:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, 0)
+    Kit.Fit(self.intro, w)
+    self.list:ClearAllPoints() self.list:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, -22)
+    self.list:Resize(w, math.max(40, h - 22 - 22))
+    self.foot:ClearAllPoints() self.foot:SetPoint("BOTTOMLEFT", self.body, "BOTTOMLEFT", 0, 2)
+    Kit.Fit(self.foot, w)
+  end })
+  d:SetTitle(L["Choose your route"], "Interface\\Icons\\INV_Misc_Map_01")
+  d.intro = Kit.Text(d.body, "sub", Kit.C.muted)
+  d.foot = Kit.Text(d.body, "sub", Kit.C.muted)
+  d.foot:SetText(L["You can change it in the middle of the route: Leveldon goes on with the same step, or the first one you have not done yet. Levels 30 to 60 stay the same."])
+  d.list = Kit.List(d.body, { zebra = false, onClick = function(it)
+    if it.key then picked = it.key Refresh() end
+  end })
+  dlg = d
+  return d
 end
-ns.LinesPanel = function() return panel end -- (tests)
+
+function ns.ShowLines()
+  if not dlg then Create() end
+  picked = nil
+  Refresh()
+  dlg:Show()
+  dlg:Layout()
+  return dlg
+end
+ns.LinesPanel = function() return dlg end -- (tests)
+ns.LinesPick = function(key) picked = key Refresh() end -- (tests)
 
 -- /lvd line: the choice window; /lvd line <key>: take that start area (own: back to the race's own)
 function ns.LineCommand(arg)

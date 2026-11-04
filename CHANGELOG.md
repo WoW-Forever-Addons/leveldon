@@ -1,5 +1,19 @@
 # Changes
 
+## 0.3.0 Beta
+
+- **The Don look:** the route window like Questdon's list: header with the gear, back, next, report and read buttons, chapter ring, a focus card for the step to do now (objectives with counter and bar, "Also here", hints), the next steps as small one-line rows ("Accept: <quest>", NPC and place in the tooltip). Drag the height freely; the window no longer jumps. Run line and XP bar with plan mark are options (off by default).
+- **Size:** the window follows the shared scale of the Don windows; its own Size option is now on top of it (100 % by default, reset once).
+- **Own options window**, also without Questdon (`/lvd options`).
+- **Minimap button** with Leveldon's logo and a right-click menu (route window, switches, "All options", "Hide minimap button").
+- **Better routes:** class quests of other classes drop out of your route; the Horde warrior's armour quests only after their pre-quest and from level 30; quests that start in capital cities are placed where you pass by; Redemption for Dwarf Paladins and Aquatic Form for Night Elf and Tauren Druids.
+- **"Only record" stays silent** in the chat; answers to `/lvd` commands still show.
+- **Classic Era:** route sharing works over yell (at most 4 an hour); a click on a step opens the classic quest log.
+- **Recording:** the first session after a new install is recorded too, a /reload continues the running session, up to 150 sessions are kept.
+- **Window size:** all Don windows share one scale, 80 % by default, set from 60 to 110 % under General > Window in the options window. Saved window sizes are reset once, places stay.
+- **Addon list:** the addon has its own logo in the game's addon list.
+- **Update note:** new files, so restart the game after updating (a /reload is not enough).
+
 ## 0.2.9 Beta
 
 - **New required addons: DonData and DonMap. Questdon is now optional.** Leveldon reads its quests from **DonData** and points the way with **DonMap**. The CurseForge app installs both for you. If you install by hand, download DonData and DonMap too and put their folders next to Leveldon in `Interface\AddOns`, or Leveldon does not load.

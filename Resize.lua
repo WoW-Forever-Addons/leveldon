@@ -4,17 +4,19 @@ local L = ns.L
 ---------------------------------------------------------------------------
 -- (0.1.7, Daniel 11.10.: "the Leveldon window is very small; variable, a handle at the bottom right to
 -- change width and height, like a Windows window; and the text is very small for my eyes")
--- The handle at the bottom right: dragging right and left sets the width (260 to 800), down and up how
--- many coming steps the window shows (1 to 12), so the window grows with what it shows. Ctrl + mouse
--- wheel over the window's title bar or the handle: text size (the whole window, 60 to 160 %);
--- /lvd text 1.3 sets it, /lvd text reset goes back. Saved per character (LeveldonCharDB.panel).
--- Default text size 120 % (Daniel: too small at 100 %).
+-- The handle at the bottom right: dragging sets width (260 to 600) and height (140 to 1000) like a Windows window.
+-- (02.11.2026, StyleKit 2 step 4, Daniel: "Höhe frei ziehbar" instead of "number of coming steps 1 to 12") the window keeps
+-- that height (Style.Panel SetFixedHeight): the card grows downwards, the list of coming steps gets the rest, nothing
+-- jumps. Ctrl + mouse wheel over the window's title bar or the handle: text size (the whole window, 60 to 160 %);
+-- /lvd text 1.3 sets it, /lvd text reset goes back. Saved per character (LeveldonCharDB.panel: w, h, scale).
+-- Default text size 120 % (Daniel: too small at 100 %). (03.11.2026, Daniel: "übertrieben groß alles") 100 %, under DonCore's
+-- shared window scale (Kit.scale, 80 % by default, "General" in the options window) like every Don window; start height
+-- for the card and 3 coming steps.
 ---------------------------------------------------------------------------
-local MIN_W, MAX_W = 260, 800
-local MIN_LINES, MAX_LINES = 1, 12
-local ROW = 18          -- window units per coming step when dragging down
-local DEFAULT_SCALE = 1.2
-local DEFAULT_LINES = 3
+local MIN_W, MAX_W = 260, 600
+local MIN_H, MAX_H = 140, 1000
+local DEFAULT_SCALE = 1
+local DEFAULT_H = 264 -- (03.11.2026, Daniel's picture: 330 showed 6 coming steps without the way line, he wants 3)
 local DEFAULT_W = 360
 
 local function Store()
@@ -25,18 +27,19 @@ end
 
 local function Panel() return ns.LeveldonPanelFrame and ns.LeveldonPanelFrame() end
 
--- width and coming steps, applied and saved
-local function Apply(w, lines, save)
+-- width and height, applied and saved
+local function Apply(w, h, save)
   local p = Panel()
   if not p then return end
   w = math.max(MIN_W, math.min(MAX_W, math.floor((tonumber(w) or DEFAULT_W) + 0.5)))
-  lines = math.max(MIN_LINES, math.min(MAX_LINES, math.floor(tonumber(lines) or DEFAULT_LINES)))
-  ns.nextShown = lines
-  if p._width ~= w then p:SetPanelWidth(w) end
-  if ns.LeveldonRefresh then ns.LeveldonRefresh() end
+  h = math.max(MIN_H, math.min(MAX_H, math.floor((tonumber(h) or DEFAULT_H) + 0.5)))
+  ns.winHeight = h
+  local wide = p._width ~= w
+  if p.SetFixedHeight then p:SetFixedHeight(h) end
+  if wide then p:SetPanelWidth(w) if ns.LeveldonRefresh then ns.LeveldonRefresh() end end
   if save then
     local st = Store()
-    st.w, st.lines = w, lines
+    st.w, st.h, st.lines = w, h, nil
   end
 end
 ns.LeveldonApplySize = Apply -- (tests)
@@ -82,7 +85,7 @@ local function Attach()
   if not p or grip then return end
   local st = Store()
   if st.scale == nil then SetText(DEFAULT_SCALE) end
-  Apply(st.w or DEFAULT_W, st.lines or DEFAULT_LINES, false)
+  Apply(st.w or DEFAULT_W, st.h or DEFAULT_H, false)
   grip = ns.CreateFrame("Button", "LeveldonResizeGrip", p)
   grip:SetSize(16, 16)
   grip:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -3, 3)
@@ -95,7 +98,7 @@ local function Attach()
   grip:SetScript("OnMouseWheel", Wheel)
   grip:SetScript("OnEnter", function(self)
     if ns.Style and ns.Style.Tooltip then
-      ns.Style.Tooltip(self, L["Window size"], { L["Drag: width (right, left) and how many coming steps (down, up)."],
+      ns.Style.Tooltip(self, L["Window size"], { L["Drag: width and height of the window."],
         L["Ctrl + mouse wheel: text size."], L["Shift + mouse wheel: background opacity."] }, "/lvd text 1.3")
     end
   end)
@@ -104,19 +107,18 @@ local function Attach()
     if p._locked then return end
     PinTopLeft(p)
     local x, y = Cursor(p)
-    self._drag = { x = x, y = y, w = p._width or DEFAULT_W, lines = ns.nextShown or DEFAULT_LINES }
+    self._drag = { x = x, y = y, w = p._width or DEFAULT_W, h = ns.winHeight or DEFAULT_H }
     self:SetScript("OnUpdate", function()
       local d = self._drag
       if not d then return end
       local cx, cy = Cursor(p)
-      local w = d.w + (cx - d.x)
-      local lines = d.lines + math.floor((d.y - cy) / ROW + 0.5)
-      if math.floor(w + 0.5) ~= p._width or lines ~= ns.nextShown then Apply(w, lines, false) end
+      local w, h = math.floor(d.w + (cx - d.x) + 0.5), math.floor(d.h + (d.y - cy) + 0.5)
+      if w ~= p._width or h ~= ns.winHeight then Apply(w, h, false) end
     end)
   end)
   grip:SetScript("OnMouseUp", function(self)
     self:SetScript("OnUpdate", nil)
-    if self._drag then Apply(p._width, ns.nextShown, true) end
+    if self._drag then Apply(p._width, ns.winHeight, true) end
     self._drag = nil
   end)
   -- Ctrl + mouse wheel over the title bar as well
