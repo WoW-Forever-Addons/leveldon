@@ -168,6 +168,11 @@ local function Checksum(s)
   return h
 end
 local function Me()
+  -- (05.11.2026) Forever: "Mae Wipeborn-<realm>", the sender of the own messages is "Mae Wipeborn" (QD.lua)
+  if ns.Surnames and ns.Surnames() then
+    local n = ns.UnitNameRealm("player")
+    return n and (n .. "-" .. ns.MyRealmKey()) or nil
+  end
   if not UnitFullName then return nil end
   local name, realm = UnitFullName("player") -- (both: "a and f()" would keep only the first)
   return name and (name .. "-" .. (realm or "")) or nil

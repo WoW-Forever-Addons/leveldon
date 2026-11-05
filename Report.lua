@@ -52,7 +52,9 @@ local function Save()
   local text = dlg.box:GetText() or ""
   text = text:gsub("[\r\n]+", " "):sub(1, 400)
   local m, x, y = Pos()
-  local name, realm = UnitFullName and UnitFullName("player")
+  local name, realm
+  if UnitFullName then name, realm = UnitFullName("player") end -- (05.11.2026) both
+  if ns.Surnames and ns.Surnames() then name, realm = ns.UnitNameRealm("player"), ns.MyRealmKey() end -- Forever (QD.lua)
   local r = LeveldonDB.reports
   r[#r + 1] = { t = time and time() or 0, c = (name or "?") .. "-" .. (realm or ""), lv = UnitLevel and UnitLevel("player") or 0,
     m = m, x = x and math.floor(x * 100 + 0.5) / 100, y = y and math.floor(y * 100 + 0.5) / 100,

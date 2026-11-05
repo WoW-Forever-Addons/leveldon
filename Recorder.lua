@@ -135,6 +135,8 @@ local function Start()
   rec.v = 1
   rec.sessions = type(rec.sessions) == "table" and rec.sessions or {}
   local name, realm = Call(UnitFullName, "player")
+  -- (05.11.2026) Forever: "Mae Wipeborn" and GetNormalizedRealmName, not the surname as realm (QD.lua)
+  if ns.Surnames and ns.Surnames() then name, realm = ns.UnitNameRealm("player"), ns.MyRealmKey() end
   local _, race = Call(UnitRace, "player")
   local _, cls = Call(UnitClass, "player")
   t0 = Now()

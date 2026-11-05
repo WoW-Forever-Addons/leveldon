@@ -1,4 +1,4 @@
-# Leveldon 0.3.0 Beta (WoW Forever)
+# Leveldon 0.3.1 Beta (WoW Forever)
 
 Leveldon ist ein Levelguide für WoW Forever: die schnellste Route mit Quests, Flugpunkten, Ruhestein, Lehrern und Händlern, Schritt für Schritt, mit Questdons Kompass. Die Routen sind pro Volk geplant, die Quests und Lehrer deiner Klasse liegen dort, wo sie am wenigsten Weg kosten.
 

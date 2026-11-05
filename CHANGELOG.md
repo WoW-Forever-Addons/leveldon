@@ -1,5 +1,10 @@
 # Changes
 
+## 0.3.1 Beta
+
+- **Trainers:** the list of spells to learn follows the WoW Forever build 70790 (spells the trainers no longer teach are gone).
+- **Surnames on WoW Forever:** names are kept as first name and surname, as the game gives them (shared routes and reports name the right player).
+
 ## 0.3.0 Beta
 
 - **The Don look:** the route window like Questdon's list: header with the gear, back, next, report and read buttons, chapter ring, a focus card for the step to do now (objectives with counter and bar, "Also here", hints), the next steps as small one-line rows ("Accept: <quest>", NPC and place in the tooltip). Drag the height freely; the window no longer jumps. Run line and XP bar with plan mark are options (off by default).
