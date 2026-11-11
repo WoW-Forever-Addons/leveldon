@@ -1,5 +1,10 @@
 # Changes
 
+## 0.3.3 Beta
+
+- **Shorter walks:** every route from level 1 to 30 was gone through for extra ways: steps you walk past anyway are now done on the way instead of in a separate trip. No route got longer or slower.
+- **Hints at tricky steps:** about 150 quests now carry a short hint where players usually get stuck: where the cave or mine entrance is, that the NPC stands upstairs or in the cellar, which mob really drops the item, what to buy first, timed quests and escorts.
+
 ## 0.3.2 Beta
 
 - **"Only record":** in this mode Leveldon no longer sends its step to Questdon's arrow, and its window stays closed at login. Closing or opening the window takes the step off the arrow or gives it back at once.

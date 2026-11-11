@@ -1,4 +1,4 @@
-local Style = LibStub("DonCore-1.0"):NewModule("Style", 14)
+local Style = LibStub("DonCore-1.0"):NewModule("Style", 15)
 
 ---------------------------------------------------------------------------
 -- Style kit, DonCore module "Style" (minor 5; Style.VERSION = 3 is the kit's own version), see DESIGN.md.
@@ -23,6 +23,10 @@ local Style = LibStub("DonCore-1.0"):NewModule("Style", 14)
 -- ohne lesbar sein"). (minor 13) a fitted text that gets the plain outline stays inside the room it was fitted to.
 -- (minor 14, 11.11.2026, CurseForge t0tal) a dragged panel is saved hanging at its top edge, so a list that changes its
 -- height grows downwards, not around the screen point the game picked; older saved places are moved up once.
+-- (minor 15, 11.11.2026, Profitdon, Daniel's pictures 122028 ff.: tabs "Herst...", first row and some heads 1.6 times too
+-- big after the game window had changed its size) FitText no longer sets the font on the text itself (such a text kept its
+-- old pixel size when the resolution changed, texts on a font object followed): one shared font object per file, size
+-- and flags (Style.FitFont), colour, shadow and alignment of the text are kept.
 ---------------------------------------------------------------------------
 if not Style then return end -- the same or a newer Style is loaded already
 
@@ -235,9 +239,45 @@ local function BaseFont(fs)
   return base
 end
 
+Style.fitFonts = Style.fitFonts or {}
+function Style.FitFont(path, size, flags)
+  flags = flags or ""
+  local key = tostring(path) .. "\0" .. tostring(size) .. "\0" .. tostring(flags)
+  local f = Style.fitFonts[key]
+  if f == nil then
+    f = false
+    if type(CreateFont) == "function" then
+      local n, name = 0
+      repeat n = n + 1 name = "DonStyleFitFont" .. n until not _G[name]
+      local ok, obj = pcall(CreateFont, name)
+      if ok and obj and Call(obj, "SetFont", path, size, flags) then f = obj end
+    end
+    Style.fitFonts[key] = f
+  end
+  return f or nil
+end
+
 local function SetSize(fs, base, size)
   if fs._fitSize ~= size then
-    Call(fs, "SetFont", base[1], size, base[3])
+    local fo = fs.SetFontObject and Style.FitFont(base[1], size, base[3])
+    if fo then
+      -- a font object brings its own colour, shadow and alignment: keep the text's
+      local okC, r, g, b, a = Call(fs, "GetTextColor")
+      local okO, sx, sy = Call(fs, "GetShadowOffset")
+      local okS, sr, sg, sb, sa = Call(fs, "GetShadowColor")
+      local okH, jh = Call(fs, "GetJustifyH")
+      local okV, jv = Call(fs, "GetJustifyV")
+      local okP, sp = Call(fs, "GetSpacing")
+      if not Call(fs, "SetFontObject", fo) then Call(fs, "SetFont", base[1], size, base[3]) end
+      if okC and type(r) == "number" then Call(fs, "SetTextColor", r, g, b, a) end
+      if okO and type(sx) == "number" then Call(fs, "SetShadowOffset", sx, sy) end
+      if okS and type(sr) == "number" then Call(fs, "SetShadowColor", sr, sg, sb, sa) end
+      if okH and type(jh) == "string" then Call(fs, "SetJustifyH", jh) end
+      if okV and type(jv) == "string" then Call(fs, "SetJustifyV", jv) end
+      if okP and type(sp) == "number" then Call(fs, "SetSpacing", sp) end
+    else
+      Call(fs, "SetFont", base[1], size, base[3])
+    end
     fs._fitSize = size
   end
 end

@@ -44,3 +44,5 @@ Leveldon ist ein Levelguide für WoW Forever: die schnellste Route mit Quests, F
 Trainer-Daten nach WhatsTraining (MIT, siehe `LICENSE-WhatsTraining.txt`), ForeverDB (auch foreverdb.net für Zaubernamen) und CMaNGOS classic-db (beide GPL v3); `Training.lua` steht deshalb unter der GPL v3 (siehe `LICENSE-GPLv3.txt`). Gruppenquests und Händler nach CMaNGOS classic-db und ForeverDB. Einige Klassenlehrer (Untote Paladine, Skyborne auf Zephras Isle) nach ForeverDB (Starts.lua, in Forever gesehen).
 
 Data from ForeverDB.net (https://foreverdb.net) (GPL v3 mit Namensnennung, siehe NOTICE.txt der ForeverDB).
+
+Hinweise an Schritten (Höhleneingänge, versteckte NPCs, Drops): CMaNGOS classic-db (GPL v3), eigene Aufnahmen; welche Ziele in einer Höhle liegen, nach den Höhlengrenzen aus OpenMap (MIT, Copyright (c) 2026 OpenMap contributors).
