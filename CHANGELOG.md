@@ -1,5 +1,11 @@
 # Changes
 
+## 0.3.2 Beta
+
+- **"Only record":** in this mode Leveldon no longer sends its step to Questdon's arrow, and its window stays closed at login. Closing or opening the window takes the step off the arrow or gives it back at once.
+- **Recording:** quest items taken out of the bank, mail, a trade or the auction house are not recorded as found there.
+- **Window keeps its top edge:** after moving it, the window grows downwards instead of from its middle.
+
 ## 0.3.1 Beta
 
 - **Trainers:** the list of spells to learn follows the WoW Forever build 70790 (spells the trainers no longer teach are gone).

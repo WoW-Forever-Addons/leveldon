@@ -323,7 +323,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.3.1"
+local VERSION = "0.3.2"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -1332,9 +1332,15 @@ local function Arrow()
   local a = API()
   if not (a and a.SetArrowTarget) then return end
   -- (16.10., Questdon review 3) the window closed: no step for Questdon's arrow (it followed the step anyway)
-  if panel and panel.IsShown and not panel:IsShown() then a.SetArrowTarget(nil) return end
+  -- (07.11.2026, Daniel: "in Leveldon I only have recording on", yet its step "Turn in: Find Bingles" led Questdon's
+  -- arrow) only recording: no step for the arrow, also not with the window open
+  if (panel and panel.IsShown and not panel:IsShown()) or (ns.RecordOnly and ns.RecordOnly()) then
+    ns._arrowT = nil
+    a.SetArrowTarget(nil)
+    return
+  end
   local s = STEPS[cur]
-  if not s then a.SetArrowTarget(nil) return end
+  if not s then ns._arrowT = nil a.SetArrowTarget(nil) return end
   -- (11.10., Daniel: "the step's quest selected in Blizzard's tracker too, so the map marks its ? or its area")
   -- once per quest of a step, so a quest you pick yourself afterwards stays picked
   if s.q and (s.k == "do" or s.k == "turnin") and InLog(s.q) and ns._superQ ~= s.q
@@ -4330,13 +4336,16 @@ local function Build()
   panel:SetScript("OnShow", function(self, ...)
     if onShow then onShow(self, ...) end
     if ns._winDirty then pcall(Refresh) end
+    pcall(Arrow) -- (07.11.2026) the step back on the arrow
   end)
   panel:SetScript("OnHide", function(self, ...)
     if onHide then onHide(self, ...) end
     if ns.LvdWin then pcall(ns.LvdWin.Finish, self) end
+    pcall(Arrow) -- (07.11.2026) the window closed: its step leaves the arrow at once, not at the next step
   end)
   ns._winDirty = true
-  if Get("shown") ~= false then panel:FadeIn() end
+  -- (07.11.2026, Daniel's Mairi: only recording on, the window still came at login) only recording keeps it closed
+  if Get("shown") ~= false and not (ns.RecordOnly and ns.RecordOnly()) then panel:FadeIn() end
 end
 
 -- (23.10., Daniel's /lvd mem: the three tickers of PLAYER_LOGIN 62 KB a second together) their parts by name: called

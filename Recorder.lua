@@ -444,6 +444,12 @@ f:SetScript("OnEvent", function(_, e, ...)
     bucket.since = Now()
   elseif e == "PLAYER_REGEN_ENABLED" then
     if bucket.since then bucket.combat = bucket.combat + (Now() - bucket.since) bucket.since = nil end
+  elseif e == "BANKFRAME_OPENED" or e == "GUILDBANKFRAME_OPENED" or e == "MAIL_SHOW" or e == "TRADE_SHOW"
+      or e == "AUCTION_HOUSE_SHOW" then
+    ns.RecItemsMoving(e, true)
+  elseif e == "BANKFRAME_CLOSED" or e == "GUILDBANKFRAME_CLOSED" or e == "MAIL_CLOSED" or e == "TRADE_CLOSED"
+      or e == "AUCTION_HOUSE_CLOSED" then
+    ns.RecItemsMoving(e, false)
   elseif e == "MERCHANT_SHOW" then
     Talked() ShopOpen()
   elseif e == "MERCHANT_CLOSED" then
@@ -472,7 +478,9 @@ local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "PLAYER_L
   "PLAYER_XP_UPDATE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_ALIVE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
   "MERCHANT_SHOW", "MERCHANT_CLOSED", "TRAINER_SHOW", "TRAINER_CLOSED",
   "LEARNED_SPELL_IN_TAB", "GOSSIP_SHOW", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_GREETING",
-  "TAXIMAP_OPENED", "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_LOGOUT", "PLAYER_ENTERING_WORLD" }
+  "TAXIMAP_OPENED", "UNIT_SPELLCAST_SUCCEEDED", "PLAYER_LOGOUT", "PLAYER_ENTERING_WORLD",
+  "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "GUILDBANKFRAME_OPENED", "GUILDBANKFRAME_CLOSED", "MAIL_SHOW", "MAIL_CLOSED",
+  "TRADE_SHOW", "TRADE_CLOSED", "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED" }
 pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 
 ---------------------------------------------------------------------------
@@ -480,6 +488,20 @@ pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 -- space, deaths with the way back, dungeons
 ---------------------------------------------------------------------------
 local more = { objs = nil, pause = nil, still = nil, group = nil, inst = nil, full = false, moneyAt = 0 }
+
+-- (10.11.2026, Daniel: quest items out of the bank showed the bank as a find spot in Questdon) items that only change
+-- hands (bank, guild bank, mail, trade, auction house; open and 5 s after closing) raise a counter without a find:
+-- no J then (rec_to_questdon.py makes Questdon spots of J lines)
+local moving, movedAt = {}, -1000
+function ns.RecItemsMoving(what, open)
+  local key = tostring(what):gsub("_SHOW$", ""):gsub("_CLOSED$", ""):gsub("_OPENED$", "")
+  if open then moving[key] = true else moving[key] = nil movedAt = Now() end
+end
+local function ItemsMoving()
+  local since = Now() - movedAt
+  return next(moving) ~= nil or (since >= 0 and since <= 5)
+end
+ns.RecItemsMovingNow = ItemsMoving -- (tests)
 
 -- objective counters: J when one went up (the first look only notes them)
 local function ObjectiveWatch()
@@ -505,7 +527,7 @@ local function ObjectiveWatch()
       local have, need = Num(o.numFulfilled) or 0, Num(o.numRequired) or 0
       now[q][i] = have
       local before = not first and more.objs[q] and more.objs[q][i]
-      if before and have > before then Ev("J", q, i, have, need, PosText()) end
+      if before and have > before and not ItemsMoving() then Ev("J", q, i, have, need, PosText()) end
     end
   end
   more.objs = now
