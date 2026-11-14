@@ -1,4 +1,4 @@
-local Kit = LibStub("DonCore-1.0"):NewModule("Kit", 24)
+local Kit = LibStub("DonCore-1.0"):NewModule("Kit", 25)
 
 ---------------------------------------------------------------------------
 -- DonCore module "Kit" (minor 1, 01.11.2026, STYLEKIT_PLAN.md "Schritt 2"; minor 2, 02.11.2026: Kit.IconButton, the symbols from
@@ -39,6 +39,8 @@ local Kit = LibStub("DonCore-1.0"):NewModule("Kit", 24)
 -- (minor 16, 04.11.2026, Era-Test, Daniel: "die zahlen sind sehr eng an dem / geschrieben besonders die 1") Kit.Fraction(a, b):
 -- "a / b" with a space on each side of the slash (Ring, ListRow progress); a Kit.Dialog always shows at Kit.scale times
 -- its own factor (d:SetOwnScale), a SetScale from outside before Show no longer stacks on top (Luredon's 1.5)
+-- (minor 25, 12.11.2026, Questdon's item buttons in the quest list, Daniel: "Gleiches kommt aus DonCore") Kit.ItemButton:
+-- a protected button that uses an item (icon, count, cooldown, a watch while a change waits for the end of a fight)
 -- (minor 24, 11.11.2026, Profitdon's Auswertung, Daniel's picture 122142: two lines without a name, one peak of 196g
 -- pressed five days of the curve flat) LineChart: opts.legend (the labels of the series in their colours, top left) and
 -- opts.clipPeak = factor (a peak more than factor times the 90 % value is cut at the top edge, c.clipped holds its real
@@ -77,7 +79,7 @@ local Kit = LibStub("DonCore-1.0"):NewModule("Kit", 24)
 ---------------------------------------------------------------------------
 if not Kit then return end -- the same or a newer Kit is loaded already
 local Core = LibStub("DonCore-1.0")
-Kit.VERSION = 24
+Kit.VERSION = 25
 
 local WHITE = "Interface\\Buttons\\WHITE8x8"
 local floor, ceil, max, min, abs, pi, sin, cos = math.floor, math.ceil, math.max, math.min, math.abs, math.pi, math.sin, math.cos
@@ -4407,6 +4409,97 @@ function Kit.SecureButton(name, parent, opts)
     Kit.Fit(self.text, (self:GetWidth() or 200) - 12)
   end
   if opts.text then b:SetLabel(opts.text) end
+  return b
+end
+
+---------------------------------------------------------------------------
+-- (minor 25, 12.11.2026, Questdon's item buttons in the quest list) ItemButton: a protected button that uses an item on
+-- click (SecureActionButtonTemplate), as a symbol: the item's icon on a dark flat backing with a 1 px line, the count
+-- bottom right, the cooldown over it, a small watch top right while a change waits for the end of a fight.
+-- Same rules as SecureButton: it hangs on UIParent (never on a frame that moves in combat, and never anchored to one:
+-- a frame a protected frame is anchored to may not move in combat either), and its attributes, place, size and
+-- Show/Hide only change out of combat. What may change in combat: icon, count, cooldown, watch, dimming.
+-- opts.size (36), opts.clicks, opts.frame = false (no backing: the caller draws its own).
+-- b.icon, b.count, b.cooldown, b.wait, b.bg, b.bd, b.itemID
+-- b:SetItem(itemID) -> true when set (false in combat: nothing changed); nil takes the item off (the caller hides it)
+-- b:SetCount(n) (shown from 2 on), b:UpdateCooldown(), b:SetWaiting(on), b:SetFar(on) (grey and half clear)
+---------------------------------------------------------------------------
+local function InFight() return type(InCombatLockdown) == "function" and InCombatLockdown() and true or false end
+function Kit.ItemButton(name, parent, opts)
+  opts = opts or {}
+  local size = tonumber(opts.size) or 36
+  local b = CreateFrame("Button", name, parent, "SecureActionButtonTemplate")
+  b:SetSize(size, size)
+  -- both, as the client's own action buttons: the template itself takes the one the player's key-down setting asks for
+  if opts.clicks then Call(b, "RegisterForClicks", opts.clicks) else Call(b, "RegisterForClicks", "AnyUp", "AnyDown") end
+  if opts.frame ~= false then
+    b.bg = Tex(b, "BACKGROUND", C.input)
+    b.bg:SetPoint("TOPLEFT", -1, 1) b.bg:SetPoint("BOTTOMRIGHT", 1, -1)
+    b.bd = Border(b, C.goldMuted, -1)
+  end
+  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon:SetAllPoints()
+  Call(b.icon, "SetTexCoord", 0.07, 0.93, 0.07, 0.93)
+  b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+  b.count:SetPoint("BOTTOMRIGHT", -2, 2)
+  b.wait = b:CreateTexture(nil, "OVERLAY")
+  local ws = max(10, floor(size * 0.4 + 0.5))
+  b.wait:SetSize(ws, ws)
+  b.wait:SetPoint("TOPRIGHT", b, "TOPRIGHT", 3, 3)
+  b.wait:SetTexture("Interface\\Icons\\INV_Misc_PocketWatch_01")
+  b.wait:Hide()
+  b.cooldown = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
+  b.cooldown:SetAllPoints()
+  Call(b, "SetHighlightTexture", "Interface\\Buttons\\ButtonHilight-Square", "ADD")
+  Call(b, "SetPushedTexture", "Interface\\Buttons\\UI-Quickslot-Depress")
+  function b:SetItem(itemID)
+    if InFight() then return false end
+    itemID = tonumber(itemID)
+    self.itemID = itemID
+    if not itemID then
+      self:SetAttribute("type", nil)
+      self:SetAttribute("item", nil)
+      return true
+    end
+    self:SetAttribute("type", "item")
+    self:SetAttribute("item", "item:" .. itemID)
+    local icon
+    if type(C_Item) == "table" and type(C_Item.GetItemIconByID) == "function" then
+      local ok, tex = pcall(C_Item.GetItemIconByID, itemID)
+      icon = ok and tex or nil
+    end
+    self.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+    self.far = nil
+    Call(self.icon, "SetDesaturated", false)
+    self.icon:SetAlpha(1)
+    self:UpdateCooldown()
+    return true
+  end
+  function b:SetCount(n)
+    n = tonumber(n)
+    self.count:SetText(n and n > 1 and n or "")
+  end
+  function b:UpdateCooldown()
+    if not self.itemID then return end
+    local get = type(C_Container) == "table" and C_Container.GetItemCooldown
+    if type(get) ~= "function" then return end
+    local ok, start, duration = pcall(get, self.itemID)
+    -- SetCooldown takes secret values: no arithmetic here
+    if ok and start then self.cooldown:SetCooldown(start, duration) end
+  end
+  function b:SetWaiting(on)
+    on = on and true or false
+    if self.waiting == on then return end
+    self.waiting = on
+    if on then self.wait:Show() else self.wait:Hide() end
+  end
+  function b:SetFar(far)
+    far = far and true or false
+    if self.far == far then return end
+    self.far = far
+    Call(self.icon, "SetDesaturated", far)
+    self.icon:SetAlpha(far and 0.55 or 1)
+  end
   return b
 end
 

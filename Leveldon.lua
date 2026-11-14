@@ -323,7 +323,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.3.3"
+local VERSION = "0.3.4"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -3165,7 +3165,7 @@ local function CheckKeep(msg)
   keptSaid[id] = true
   local link = tostring(msg):match("(|c%x+|Hitem:[^|]+|h%[[^%]]+%]|h|r)") or (L["item "] .. id)
   -- (29.10., Daniel: "wäre cool, wenn dort auch steht wie viele") how many the quest wants, behind the item
-  if (tonumber(k.c) or 1) > 1 then link = link .. " 95i" .. k.c end
+  if (tonumber(k.c) or 1) > 1 then link = link .. " x" .. k.c end   -- (13.11.) plain "x": the escape for the multiplication sign had been written out broken
   ns.Say((L["|cff3fa9f5Level|rdon: keep %s, the route needs it later for \"%s\" (bank it if your bags are full)."]):format(link, k.n or "?"))
 end
 ns.CheckKeep = CheckKeep -- (tests)
@@ -3183,31 +3183,68 @@ do
     end
   end
   ns.KeepFor = KeepFor -- (tests)
+  -- (13.11.2026, Daniel: "da können die items verlinkt werden und ... die quest items die eh schon als solche
+  -- deklariert sind im inventar nicht extra") per item in the bags: the game's item link (the bag slot's, else the
+  -- one of GetItemInfo, else the plain [Name]), its name for the order, and whether the game says it has no vendor
+  -- price (hasNoValue of the slot, or a sell price of 0: quest items). Unknown counts as sellable.
   local function BagItems()
     local out = {}
     local C = C_Container
     local slots = (C and C.GetContainerNumSlots) or GetContainerNumSlots
     local idOf = (C and C.GetContainerItemID) or GetContainerItemID
     local linkOf = (C and C.GetContainerItemLink) or GetContainerItemLink
+    local infoOf = C and C.GetContainerItemInfo
+    local itemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
     if not (slots and idOf) then return out end
     for bag = 0, 4 do
       for slot = 1, (tonumber(slots(bag)) or 0) do
         local id = idOf(bag, slot)
-        if id and not out[id] then out[id] = linkOf and linkOf(bag, slot) or (L["item "] .. id) end
+        if id and not out[id] then
+          local e = { id = id }
+          local okI, info = false, nil
+          if infoOf then okI, info = pcall(infoOf, bag, slot) end
+          if not (okI and type(info) == "table") then info = nil end
+          local link = linkOf and linkOf(bag, slot)
+          if type(link) ~= "string" or link == "" then link = info and type(info.hyperlink) == "string" and info.hyperlink ~= "" and info.hyperlink or nil end
+          local name, price = info and info.itemName or nil, nil
+          if itemInfo then
+            local okG, gName, gLink, _, _, _, _, _, _, _, _, gPrice = pcall(itemInfo, id)
+            if okG then
+              if not link and type(gLink) == "string" and gLink ~= "" then link = gLink end
+              if type(name) ~= "string" and type(gName) == "string" then name = gName end
+              if type(gPrice) == "number" then price = gPrice end
+            end
+          end
+          if type(name) ~= "string" or name == "" then name = link and link:match("%[(.-)%]") or nil end
+          if not link then link = name and ("[" .. name .. "]") or (L["item "] .. id) end
+          e.link, e.name = link, name or tostring(link)
+          e.noValue = (info and info.hasNoValue == true) or price == 0
+          out[id] = e
+        end
       end
     end
     return out
   end
+  ns.KeepBagItems = BagItems -- (tests)
   function ns.KeepAtMerchant()
-    local list = {}
-    for id, link in pairs(BagItems()) do
+    local rows = {}
+    for id, e in pairs(BagItems()) do
       local k = KeepFor(id)
-      if k then list[#list + 1] = ("%s%s (%s)"):format(link, (tonumber(k.c) or 1) > 1 and (" 95i" .. k.c) or "", k.n or "?") end
+      -- an item no vendor buys (a quest item) cannot be sold by mistake: not named
+      if k and not e.noValue then
+        rows[#rows + 1] = { e.name, id, ("%s%s (%s)"):format(e.link, (tonumber(k.c) or 1) > 1 and (" x" .. k.c) or "", k.n or "?") }
+      end
     end
-    if #list == 0 then return nil end
-    table.sort(list)
-    local text = (L["|cff3fa9f5Level|rdon: do not sell %s: the route needs it later."]):format(table.concat(list, ", ", 1, math.min(#list, 5)))
-    ns.Say(text)
+    if #rows == 0 then return nil end
+    table.sort(rows, function(a, b) if a[1] ~= b[1] then return a[1] < b[1] end return a[2] < b[2] end)
+    local list = {}
+    for i = 1, math.min(#rows, 5) do list[i] = rows[i][3] end
+    local text = (L["|cff3fa9f5Level|rdon: do not sell %s: the route needs it later."]):format(table.concat(list, ", "))
+    -- (13.11.2026, Daniel chose: once per session) the same list is said once, again only when it changes
+    if text ~= ns.keepSaidText then
+      ns.keepSaidText = text
+      ns.Say(text)
+    end
     return text
   end
   local function OnItemTooltip(tt, data)

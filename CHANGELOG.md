@@ -1,5 +1,10 @@
 # Changes
 
+## 0.3.4 Beta
+
+- **Merchant reminder fixed:** the items to keep are linked and counted as "x10" again (a stray control character showed instead), quest items are not listed extra, and the same list is said only once per session.
+- **Cleaner text in narrow places:** text that is shrunk to fit keeps one font and size, also after the game window changes its size.
+
 ## 0.3.3 Beta
 
 - **Shorter walks:** every route from level 1 to 30 was gone through for extra ways: steps you walk past anyway are now done on the way instead of in a separate trip. No route got longer or slower.
