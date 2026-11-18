@@ -3120,6 +3120,25 @@ do
   end
 end
 
+-- (16.11.2026, /lvd diag, Diag.lua) the hint of the diag window to copy
+do
+  local HINT = "Ctrl+A selects all, Ctrl+C copies."
+  local DIAG = {
+    deDE = "Strg+A markiert alles, Strg+C kopiert.",
+    frFR = "Ctrl+A sélectionne tout, Ctrl+C copie.",
+    esES = "Ctrl+A selecciona todo, Ctrl+C copia.",
+    esMX = "Ctrl+A selecciona todo, Ctrl+C copia.",
+    ptBR = "Ctrl+A seleciona tudo, Ctrl+C copia.",
+    ruRU = "Ctrl+A выделяет всё, Ctrl+C копирует.",
+    koKR = "Ctrl+A로 모두 선택, Ctrl+C로 복사합니다.",
+    zhTW = "Ctrl+A 全選，Ctrl+C 複製。",
+  }
+  for loc, w in pairs(DIAG) do
+    local t = loc == "deDE" and deDE or OTHER[loc]
+    if t then t[HINT] = w end
+  end
+end
+
 local T = ns.LOCALE == "deDE" and deDE or OTHER[ns.LOCALE] or {}
 ns.L = setmetatable({}, { __index = function(_, k) return T[k] or k end })
 ns.L_deDE = deDE -- (tests)

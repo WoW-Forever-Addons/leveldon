@@ -1,5 +1,9 @@
 # Changes
 
+## 0.3.5 Beta
+
+- **`/lvd diag` opens a window:** the report opens in a copy window in the game's look, ready to paste into a comment; `/lvd diag chat` prints it in the chat.
+
 ## 0.3.4 Beta
 
 - **Merchant reminder fixed:** the items to keep are linked and counted as "x10" again (a stray control character showed instead), quest items are not listed extra, and the same list is said only once per session.

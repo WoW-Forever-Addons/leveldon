@@ -692,3 +692,12 @@ function ns.RecCommand(arg)
   print((L["|cff3fa9f5Level|rdon: writing along %s. %d sessions, %d events, %d walking points, %d reports kept (/lvd rec on|off)."]):format(
     On() and L["on"] or L["off"], n, counts.events, counts.points, LeveldonDB.reports and #LeveldonDB.reports or 0))
 end
+
+-- (16.11.2026, /lvd diag) the recorder's state for the diag window: switched on, writing now, what is kept
+function ns.RecState()
+  local r = type(LeveldonDB) == "table" and type(LeveldonDB.rec) == "table" and LeveldonDB.rec or nil
+  if r and r ~= rec and type(r.sessions) == "table" then rec = r Recount() end
+  return { on = On(), active = sess ~= nil, sessions = rec and type(rec.sessions) == "table" and #rec.sessions or 0,
+    events = counts.events, points = counts.points,
+    reports = type(LeveldonDB) == "table" and type(LeveldonDB.reports) == "table" and #LeveldonDB.reports or 0 }
+end

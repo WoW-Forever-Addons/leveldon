@@ -323,7 +323,7 @@ local VERB = {
   profs = L["Choose your professions"], learn = L["Learn"], skillup = L["Raise"], buy = L["Buy"], use = L["Use"], farm = L["Farm"],
   sell = L["Sell your loot"], die = L["Let yourself die"],
 }
-local VERSION = "0.3.4"
+local VERSION = "0.3.5"
 do -- (23.10., 0.2.5 showed "beta 0.2.4") the toc's version wins, so the two cannot drift apart again
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local ok, v = false, nil
@@ -4691,6 +4691,7 @@ SlashCmdList.LEVELDON = function(msg)
   if msg == "next" then Skip(1)
   elseif msg == "mem" or msg:match("^mem %d+$") then if ns.MemCheck then ns.MemCheck(msg:match("^mem (%d+)$")) end -- (23.10.) memory by part
   elseif msg == "options" or msg == "config" then if ns.OpenOptions then ns.OpenOptions() end
+  elseif msg == "diag" or msg == "diag chat" then if ns.ShowDiag then ns.ShowDiag(msg == "diag chat") end -- (16.11.2026) Diag.lua
   elseif msg == "report" then if ns.OpenReport then ns.OpenReport() end
   elseif msg == "text" or msg:match("^text ") then if ns.TextCommand then ns.TextCommand(msg:match("^text%s*(.*)$")) end
   elseif msg == "rec" or msg == "rec on" or msg == "rec off" then if ns.RecCommand then ns.RecCommand(msg:match("^rec ?(.*)$")) end
